@@ -73,7 +73,7 @@ function createSmoothPath(points: { x: number; y: number }[]): string {
 export function renderSparkline(values: number[], options: SparklineOptions = {}): string {
   const width = options.width || 120;
   const height = options.height || 36;
-  const color = options.color || '#38bdf8';
+  const color = options.color || '#10b981';
   const strokeWidth = options.strokeWidth || 2;
   const gradient = options.gradient !== false;
 
@@ -145,10 +145,10 @@ export function renderDonutGauge(percent: number, options: DonutOptions = {}): s
   if (!color) {
     if (pct >= 90) color = 'var(--danger, #ef4444)';
     else if (pct >= 75) color = 'var(--warning, #f59e0b)';
-    else color = 'var(--primary, #38bdf8)';
+    else color = 'var(--primary, #10b981)';
   }
 
-  const trackColor = options.trackColor || 'var(--bar-bg, #1e293b)';
+  const trackColor = options.trackColor || 'var(--bar-bg, #222226)';
 
   return `
     <div class="donut-gauge-wrap" style="width:${size}px; height:${size}px; position:relative; display:inline-flex; align-items:center; justify-content:center;">
@@ -162,8 +162,8 @@ export function renderDonutGauge(percent: number, options: DonutOptions = {}): s
         />
       </svg>
       <div class="donut-gauge-content" style="position:absolute; text-align:center; pointer-events:none;">
-        <div style="font-size:${size < 80 ? '0.95rem' : '1.15rem'}; font-weight:800; line-height:1; color:var(--text);">${pct}%</div>
-        ${label ? `<div style="font-size:0.65rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-top:2px;">${label}</div>` : ''}
+        <div style="font-size:${size < 48 ? '0.68rem' : size < 60 ? '0.78rem' : size < 85 ? '0.96rem' : '1.18rem'}; font-weight:800; line-height:1; color:var(--text);">${pct}%</div>
+        ${label ? `<div style="font-size:${size < 60 ? '0.54rem' : '0.65rem'}; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-top:${size < 60 ? '1px' : '3px'};">${label}</div>` : ''}
         ${sublabel ? `<div style="font-size:0.6rem; color:var(--text-muted); opacity:0.8;">${sublabel}</div>` : ''}
       </div>
     </div>
@@ -176,7 +176,7 @@ export function renderBarGauge(percent: number, label: string, valueStr: string,
   if (!barColor) {
     if (pct >= 90) barColor = 'var(--danger, #ef4444)';
     else if (pct >= 75) barColor = 'var(--warning, #f59e0b)';
-    else barColor = 'var(--primary, #38bdf8)';
+    else barColor = 'var(--primary, #10b981)';
   }
 
   return `

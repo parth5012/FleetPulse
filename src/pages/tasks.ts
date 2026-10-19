@@ -64,22 +64,22 @@ export async function renderTasks(container: HTMLElement): Promise<void> {
 
       <!-- Quick Vitals Ribbon with Donut Gauges -->
       <div class="vitals-ribbon" id="tasksVitals">
-        <div class="vital-card" style="display:flex; align-items:center; gap:14px;">
-          <div id="vitalCpuDonut" style="flex-shrink:0;"></div>
-          <div style="flex:1; min-width:0;">
+        <div class="vital-card vital-card-with-gauge">
+          <div id="vitalCpuDonut" class="vital-donut-wrap"></div>
+          <div class="vital-info-wrap">
             <div class="vital-label">CPU LOAD</div>
             <div class="vital-value" id="vitalCpu">--%</div>
-            <div class="vital-bar-track" style="margin-top:6px;">
+            <div class="vital-bar-track">
               <div class="vital-bar-fill vital-cpu" id="vitalCpuBar" style="width: 0%"></div>
             </div>
           </div>
         </div>
-        <div class="vital-card" style="display:flex; align-items:center; gap:14px;">
-          <div id="vitalRamDonut" style="flex-shrink:0;"></div>
-          <div style="flex:1; min-width:0;">
+        <div class="vital-card vital-card-with-gauge">
+          <div id="vitalRamDonut" class="vital-donut-wrap"></div>
+          <div class="vital-info-wrap">
             <div class="vital-label">RAM USED</div>
             <div class="vital-value" id="vitalRam">--%</div>
-            <div class="vital-bar-track" style="margin-top:6px;">
+            <div class="vital-bar-track">
               <div class="vital-bar-fill vital-ram" id="vitalRamBar" style="width: 0%"></div>
             </div>
           </div>
@@ -225,13 +225,16 @@ function renderVitals(container: HTMLElement): void {
   const procSubEl = container.querySelector('#vitalProcSub');
   const threadsEl = container.querySelector('#vitalThreads');
 
+  const isMobile = window.innerWidth <= 640;
+  const donutSize = isMobile ? 44 : 58;
+
   if (cpuEl) cpuEl.textContent = `${ov.cpu_total_percent.toFixed(1)}%`;
   if (cpuBar) cpuBar.style.width = `${Math.min(ov.cpu_total_percent, 100)}%`;
   if (cpuDonutEl) {
     cpuDonutEl.innerHTML = renderDonutGauge(ov.cpu_total_percent, {
-      size: 58,
-      strokeWidth: 6,
-      color: ov.cpu_total_percent > 75 ? '#ef4444' : ov.cpu_total_percent > 40 ? '#f59e0b' : '#38bdf8',
+      size: donutSize,
+      strokeWidth: isMobile ? 4 : 5,
+      color: ov.cpu_total_percent > 75 ? '#ef4444' : ov.cpu_total_percent > 40 ? '#f59e0b' : '#10b981',
     });
   }
 
@@ -239,9 +242,9 @@ function renderVitals(container: HTMLElement): void {
   if (ramBar) ramBar.style.width = `${Math.min(ov.memory_used_percent, 100)}%`;
   if (ramDonutEl) {
     ramDonutEl.innerHTML = renderDonutGauge(ov.memory_used_percent, {
-      size: 58,
-      strokeWidth: 6,
-      color: ov.memory_used_percent > 85 ? '#ef4444' : '#818cf8',
+      size: donutSize,
+      strokeWidth: isMobile ? 4 : 5,
+      color: ov.memory_used_percent > 85 ? '#ef4444' : '#a855f7',
     });
   }
 
@@ -257,7 +260,7 @@ function renderVitals(container: HTMLElement): void {
   if (distCard && state.tasks.length > 0) {
     distCard.style.display = 'block';
 
-    const colors = ['#38bdf8', '#818cf8', '#34d399', '#f59e0b', '#ec4899'];
+    const colors = ['#10b981', '#a855f7', '#f59e0b', '#06b6d4', '#ec4899'];
 
     // Top 5 by CPU
     const topCpuTasks = [...state.tasks]

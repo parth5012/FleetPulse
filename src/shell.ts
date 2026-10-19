@@ -58,6 +58,10 @@ export function renderShell(root: HTMLElement): void {
           <span class="nav-icon">🐳</span>
           <span class="nav-label">Fleet</span>
         </a>
+        <a href="#/antigravity" data-route="/antigravity" class="nav-item">
+          <span class="nav-icon">🔮</span>
+          <span class="nav-label">Quota</span>
+        </a>
       </nav>
     </div>
   `;

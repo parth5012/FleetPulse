@@ -71,9 +71,9 @@ export async function renderServices(container: HTMLElement): Promise<void> {
           <div class="vital-value" id="svcTotal">--</div>
           <div class="vital-sub" id="svcTotalSub">User: -- | System: --</div>
         </div>
-        <div class="vital-card" style="display:flex; align-items:center; gap:14px;">
-          <div id="svcActiveDonut" style="flex-shrink:0;"></div>
-          <div style="flex:1; min-width:0;">
+        <div class="vital-card vital-card-with-gauge">
+          <div id="svcActiveDonut" class="vital-donut-wrap"></div>
+          <div class="vital-info-wrap">
             <div class="vital-label">ACTIVE RATIO</div>
             <div class="vital-value text-success" id="svcRunning">--</div>
             <div class="vital-sub">Active daemon processes</div>
@@ -233,11 +233,14 @@ function renderVitals(container: HTMLElement): void {
   if (totalSubEl) totalSubEl.textContent = `User: ${ov.user_services} | System: ${ov.system_services}`;
   if (runEl) runEl.textContent = String(ov.running_services);
 
+  const isMobile = window.innerWidth <= 640;
+  const donutSize = isMobile ? 44 : 58;
+
   if (activeDonutEl && ov.total_services > 0) {
     const activePct = Math.round((ov.running_services / ov.total_services) * 100);
     activeDonutEl.innerHTML = renderDonutGauge(activePct, {
-      size: 58,
-      strokeWidth: 6,
+      size: donutSize,
+      strokeWidth: isMobile ? 4 : 5,
       color: '#10b981',
     });
   }
@@ -256,7 +259,7 @@ function renderVitals(container: HTMLElement): void {
   const memDistEl = container.querySelector('#svcMemDistBar') as HTMLElement;
 
   if (distCard && memDistEl && state.services.length > 0) {
-    const colors = ['#818cf8', '#38bdf8', '#34d399', '#f59e0b', '#ec4899'];
+    const colors = ['#10b981', '#a855f7', '#f59e0b', '#06b6d4', '#ec4899'];
     const topMemSvcs = [...state.services]
       .sort((a, b) => b.memory_bytes - a.memory_bytes)
       .slice(0, 5)

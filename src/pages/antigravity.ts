@@ -47,9 +47,10 @@ function renderBucket(bucket: QuotaBucket): string {
   const fillWidth = bucket.disabled ? 100 : pct;
 
   // Mini donut gauge for the bucket
+  const isMobile = window.innerWidth <= 640;
   const miniGauge = renderDonutGauge(fillWidth, {
-    size: 58,
-    strokeWidth: 6,
+    size: isMobile ? 48 : 56,
+    strokeWidth: isMobile ? 5 : 6,
     color,
     trackColor: 'var(--bar-bg)',
   });
@@ -176,9 +177,10 @@ function renderAccount(acc: AccountSnapshot): string {
       : '';
 
   // Header mini-donut for account health
+  const isMobile = window.innerWidth <= 640;
   const healthDonut = renderDonutGauge(healthPct, {
-    size: 64,
-    strokeWidth: 6,
+    size: isMobile ? 52 : 64,
+    strokeWidth: isMobile ? 5 : 6,
     label: 'Quota',
     color: healthPct > 50 ? '#10b981' : healthPct > 20 ? '#f59e0b' : '#ef4444',
   });
@@ -305,7 +307,7 @@ export async function renderAntigravity(container: HTMLElement): Promise<void> {
       let claudeFractionSum = 0;
 
       const accountSegments: StackedSegment[] = [];
-      const colors = ['#38bdf8', '#818cf8', '#34d399', '#f59e0b', '#ec4899'];
+      const colors = ['#10b981', '#a855f7', '#f59e0b', '#06b6d4', '#ec4899'];
 
       accs.forEach((a, idx) => {
         let accFraction = 0;
@@ -347,12 +349,17 @@ export async function renderAntigravity(container: HTMLElement): Promise<void> {
       const geminiPct = geminiBuckets > 0 ? Math.round((geminiFractionSum / geminiBuckets) * 100) : 100;
       const claudePct = claudeBuckets > 0 ? Math.round((claudeFractionSum / claudeBuckets) * 100) : 0;
 
+      // Responsive gauge size: compact on mobile, expansive on desktop
+      const isMobile = window.innerWidth <= 640;
+      const ribbonGaugeSize = isMobile ? 76 : 100;
+      const ribbonStrokeWidth = isMobile ? 7 : 8;
+
       // Render Visual Donut Gauges in Ribbon
       const totalWrap = container.querySelector('#gaugeTotalWrap');
       if (totalWrap) {
         totalWrap.innerHTML = renderDonutGauge(overallPct, {
-          size: 100,
-          strokeWidth: 8,
+          size: ribbonGaugeSize,
+          strokeWidth: ribbonStrokeWidth,
           label: 'Overall',
           color: overallPct > 50 ? '#10b981' : overallPct > 20 ? '#f59e0b' : '#ef4444',
         });
@@ -361,20 +368,20 @@ export async function renderAntigravity(container: HTMLElement): Promise<void> {
       const geminiWrap = container.querySelector('#gaugeGeminiWrap');
       if (geminiWrap) {
         geminiWrap.innerHTML = renderDonutGauge(geminiPct, {
-          size: 100,
-          strokeWidth: 8,
+          size: ribbonGaugeSize,
+          strokeWidth: ribbonStrokeWidth,
           label: 'Gemini',
-          color: '#38bdf8',
+          color: '#10b981',
         });
       }
 
       const claudeWrap = container.querySelector('#gaugeClaudeWrap');
       if (claudeWrap) {
         claudeWrap.innerHTML = renderDonutGauge(claudePct, {
-          size: 100,
-          strokeWidth: 8,
+          size: ribbonGaugeSize,
+          strokeWidth: ribbonStrokeWidth,
           label: '3P / Claude',
-          color: claudePct > 50 ? '#818cf8' : claudePct > 20 ? '#f59e0b' : '#ef4444',
+          color: claudePct > 50 ? '#a855f7' : claudePct > 20 ? '#f59e0b' : '#ef4444',
         });
       }
 

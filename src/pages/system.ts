@@ -148,8 +148,8 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
         <div class="chart-header">
           <div class="chart-title">📊 CPU & Memory History (Rolling 60s)</div>
           <div class="chart-legend">
-            <span class="legend-item"><i style="background:#38bdf8;"></i> CPU %</span>
-            <span class="legend-item"><i style="background:#818cf8;"></i> Memory %</span>
+            <span class="legend-item"><i style="background:#10b981;"></i> CPU %</span>
+            <span class="legend-item"><i style="background:#a855f7;"></i> Memory %</span>
           </div>
         </div>
         <div id="cpuMemChart" class="chart-body"></div>
@@ -224,7 +224,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     (container.querySelector('#cpuLogical') as HTMLElement).textContent = String(snap.cpu.core_count_logical);
     (container.querySelector('#cpuPhysical') as HTMLElement).textContent = String(snap.cpu.core_count_physical);
     (container.querySelector('#cpuSpark') as HTMLElement).innerHTML = renderSparkline(cpuHistory, {
-      color: '#38bdf8',
+      color: '#10b981',
       width: 140,
       height: 34,
     });
@@ -245,7 +245,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     (container.querySelector('#memDonut') as HTMLElement).innerHTML = renderDonutGauge(memUsedPct, {
       size: 110,
       label: 'RAM',
-      color: '#818cf8',
+      color: '#a855f7',
       sublabel: `${memUsedPct.toFixed(1)}%`,
     });
     (container.querySelector('#memTotal') as HTMLElement).textContent = formatBytes(snap.memory.total_bytes);
@@ -253,7 +253,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     (container.querySelector('#memAvail') as HTMLElement).textContent = formatBytes(snap.memory.available_bytes);
     (container.querySelector('#memSwap') as HTMLElement).textContent = formatBytes(snap.memory.swap_used_bytes);
     (container.querySelector('#memSpark') as HTMLElement).innerHTML = renderSparkline(memHistory, {
-      color: '#818cf8',
+      color: '#a855f7',
       width: 140,
       height: 34,
     });
@@ -322,8 +322,8 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     if (cpuMemEl && cpuHistory.length > 0) {
       cpuMemEl.innerHTML = renderAreaChart(
         [
-          { name: 'CPU', color: '#38bdf8', values: cpuHistory },
-          { name: 'Memory', color: '#818cf8', values: memHistory },
+          { name: 'CPU', color: '#10b981', values: cpuHistory },
+          { name: 'Memory', color: '#a855f7', values: memHistory },
         ],
         { height: 180, yMax: 100, unit: '%' }
       );

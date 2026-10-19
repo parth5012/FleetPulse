@@ -150,13 +150,13 @@ export async function renderHome(container: HTMLElement): Promise<void> {
         size: 58,
         strokeWidth: 5,
         label: 'CPU',
-        color: taskRes.overview.cpu_total_percent > 75 ? '#ef4444' : '#38bdf8',
+        color: taskRes.overview.cpu_total_percent > 75 ? '#ef4444' : '#10b981',
       });
       const ramDonut = renderDonutGauge(taskRes.overview.memory_used_percent, {
         size: 58,
         strokeWidth: 5,
         label: 'RAM',
-        color: '#818cf8',
+        color: '#a855f7',
       });
 
       preview.innerHTML = `
@@ -226,7 +226,7 @@ export async function renderHome(container: HTMLElement): Promise<void> {
     }
     const memG = container.querySelector('#homeMemGauge') as HTMLElement;
     if (memG) {
-      memG.innerHTML = renderDonutGauge(sys.memory.used_percent, { size: 76, strokeWidth: 7, label: 'RAM', color: '#818cf8' });
+      memG.innerHTML = renderDonutGauge(sys.memory.used_percent, { size: 76, strokeWidth: 7, label: 'RAM', color: '#a855f7' });
     }
     const diskG = container.querySelector('#homeDiskGauge') as HTMLElement;
     if (diskG) {

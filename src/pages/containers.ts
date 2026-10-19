@@ -200,6 +200,15 @@ export async function renderContainers(container: HTMLElement): Promise<void> {
     logLinesOutput.innerHTML = '<div class="log-loading">Fetching logs for ' + esc(c.name) + '...</div>';
 
     fetchAndRenderLogs();
+
+    if (window.innerWidth <= 768) {
+      setTimeout(() => {
+        const consoleEl = container.querySelector('#logConsoleContainer');
+        if (consoleEl) {
+          consoleEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 50);
+    }
   }
 
   function renderLogOutput(): void {
