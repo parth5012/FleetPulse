@@ -218,3 +218,137 @@ export async function triggerContainerAction(
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Tasks & Processes (btop / Task Manager style)
+// ---------------------------------------------------------------------------
+export interface TaskItem {
+  pid: number;
+  name: string;
+  username: string;
+  status: string;
+  cpu_percent: number;
+  memory_bytes: number;
+  memory_percent: number;
+  memory_formatted: string;
+  num_threads: number;
+  create_time: number;
+  cmdline: string;
+  nice: number;
+}
+
+export interface TasksOverview {
+  total_processes: number;
+  running: number;
+  sleeping: number;
+  other: number;
+  total_threads: number;
+  cpu_total_percent: number;
+  memory_used_percent: number;
+}
+
+export interface TasksResponse {
+  tasks: TaskItem[];
+  overview: TasksOverview;
+  timestamp: string;
+}
+
+export async function fetchTasks(
+  sortBy = 'cpu',
+  order = 'desc',
+  limit = 100,
+  search?: string
+): Promise<TasksResponse> {
+  const params = new URLSearchParams({
+    sort_by: sortBy,
+    order: order,
+    limit: String(limit),
+  });
+  if (search) params.set('search', search);
+  const res = await fetch(`${getApiBase()}/api/tasks?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function triggerTaskAction(
+  pid: number,
+  action: 'terminate' | 'kill'
+): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${getApiBase()}/api/tasks/${pid}/action`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// System Services (systemd User & System Scope)
+// ---------------------------------------------------------------------------
+export interface ServiceItem {
+  unit: string;
+  name: string;
+  description: string;
+  scope: 'user' | 'system';
+  load_state: string;
+  active_state: string;
+  sub_state: string;
+  main_pid: number;
+  memory_bytes: number;
+  memory_percent: number;
+  memory_formatted: string;
+  cpu_percent: number;
+  cpu_usage_nsec: number;
+}
+
+export interface ServicesOverview {
+  total_services: number;
+  running_services: number;
+  failed_services: number;
+  user_services: number;
+  system_services: number;
+  total_memory_bytes: number;
+  total_memory_formatted: string;
+}
+
+export interface ServicesResponse {
+  services: ServiceItem[];
+  overview: ServicesOverview;
+  timestamp: string;
+}
+
+export async function fetchServices(
+  scope = 'all',
+  state = 'all',
+  sortBy = 'cpu',
+  order = 'desc',
+  limit = 150,
+  search?: string
+): Promise<ServicesResponse> {
+  const params = new URLSearchParams({
+    scope,
+    state,
+    sort_by: sortBy,
+    order,
+    limit: String(limit),
+  });
+  if (search) params.set('search', search);
+  const res = await fetch(`${getApiBase()}/api/services?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function triggerServiceAction(
+  scope: 'user' | 'system',
+  unit: string,
+  action: 'restart' | 'start' | 'stop'
+): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${getApiBase()}/api/services/${scope}/${encodeURIComponent(unit)}/action`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}

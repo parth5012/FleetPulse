@@ -1,0 +1,74 @@
+{
+  "name": "Dashboard Hub - Fleet & System Observability",
+  "short_name": "Dashboard",
+  "description": "Real-time task manager, system services, Beszel server telemetry, and Dozzel container log console",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tasks (btop)",
+      "short_name": "Tasks",
+      "description": "Processes, CPU & Memory sorted tables",
+      "url": "./#/tasks",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "System Services",
+      "short_name": "Services",
+      "description": "Systemd services and RAM/CPU usage",
+      "url": "./#/services",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "System Vitals",
+      "short_name": "System",
+      "description": "Real-time CPU, RAM and Disk charts",
+      "url": "./#/system",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Containers & Logs",
+      "short_name": "Containers",
+      "description": "Dozzel-style container telemetry",
+      "url": "./#/containers",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["utilities", "productivity", "system"]
+}

@@ -1,34 +1,80 @@
 /**
  * Central Command Hub.
- * Provides high-level health cards, live telemetry summaries, and direct links
- * to the Beszel-style System Monitor, Dozzel-style Container & Log Console,
- * and Antigravity Multi-Account Quota tracker.
+ * High-level telemetry cards for Tasks (btop), System Services,
+ * Beszel vitals, Dozzel containers, and Antigravity quotas.
  */
 
-import { fetchSystemMetrics, fetchContainers, fetchLimits } from '../lib/api';
+import {
+  fetchSystemMetrics,
+  fetchContainers,
+  fetchLimits,
+  fetchTasks,
+  fetchServices,
+} from '../lib/api';
 import { formatBytes, formatUptime, esc } from '../lib/format';
-import { renderSparkline, renderDonutGauge } from '../lib/charts';
+import { renderDonutGauge } from '../lib/charts';
 
 export async function renderHome(container: HTMLElement): Promise<void> {
   container.innerHTML = `
     <div class="home-hero">
       <div class="hero-badge">⚡ UNIFIED OBSERVABILITY PLATFORM</div>
-      <h1 class="hero-title">Visual Telemetry Hub</h1>
+      <h1 class="hero-title">Visual Telemetry & Fleet Hub</h1>
       <p class="hero-desc">
-        Integrated infrastructure telemetry inspired by <strong>Beszel</strong> (lightweight real-time server vitals)
-        and <strong>Dozzel</strong> (container fleet monitoring & live log streaming).
+        Integrated infrastructure telemetry inspired by <strong>btop</strong> (process monitoring),
+        <strong>systemd</strong> (daemon health), <strong>Beszel</strong> (server vitals),
+        and <strong>Dozzel</strong> (container fleet logs).
       </p>
     </div>
 
     <!-- Quick Services Grid -->
     <div class="services-grid">
-      <!-- Card 1: Beszel System Monitor -->
+      <!-- Card 1: Tasks / btop Process Monitor -->
+      <div class="service-card" id="homeTasksCard">
+        <div class="service-head">
+          <div class="service-icon icon-tasks">⚡</div>
+          <div>
+            <h3>Tasks & Processes (btop)</h3>
+            <p class="muted">Live CPU, RAM sorted processes & task manager</p>
+          </div>
+          <span class="pill pill-live" id="homeTasksPill">Polling...</span>
+        </div>
+        <div class="service-body">
+          <div class="home-tasks-preview" id="homeTasksPreview">
+            <div class="loading-state" style="padding: 12px;"><div class="spin">⚡</div></div>
+          </div>
+        </div>
+        <div class="service-foot">
+          <a href="#/tasks" class="btn btn-primary" style="width:100%;justify-content:center;">Open Task Manager →</a>
+        </div>
+      </div>
+
+      <!-- Card 2: System Services (systemd) -->
+      <div class="service-card" id="homeSvcsCard">
+        <div class="service-head">
+          <div class="service-icon icon-svcs">⚙️</div>
+          <div>
+            <h3>System Services</h3>
+            <p class="muted">User & system daemons with RAM footprint</p>
+          </div>
+          <span class="pill pill-live" id="homeSvcsPill">Polling...</span>
+        </div>
+        <div class="service-body">
+          <div class="home-svcs-preview" id="homeSvcsPreview">
+            <div class="loading-state" style="padding: 12px;"><div class="spin">⚡</div></div>
+          </div>
+        </div>
+        <div class="service-foot">
+          <a href="#/services" class="btn btn-primary" style="width:100%;justify-content:center;">Inspect Services →</a>
+        </div>
+      </div>
+
+      <!-- Card 3: Beszel System Monitor -->
       <div class="service-card" id="homeSysCard">
         <div class="service-head">
           <div class="service-icon icon-sys">🖥️</div>
           <div>
             <h3>System Monitor (Beszel)</h3>
-            <p class="muted">Live CPU, RAM, Disk I/O & Network throughput</p>
+            <p class="muted">Live CPU, RAM, Disk I/O & Network vitals</p>
           </div>
           <span class="pill pill-live" id="homeSysPill">Polling...</span>
         </div>
@@ -49,7 +95,7 @@ export async function renderHome(container: HTMLElement): Promise<void> {
         </div>
       </div>
 
-      <!-- Card 2: Dozzel Container & Logs -->
+      <!-- Card 4: Dozzel Container & Logs -->
       <div class="service-card" id="homeDockCard">
         <div class="service-head">
           <div class="service-icon icon-dock">🐳</div>
@@ -69,10 +115,10 @@ export async function renderHome(container: HTMLElement): Promise<void> {
         </div>
       </div>
 
-      <!-- Card 3: Antigravity Quota Hub -->
+      <!-- Card 5: Antigravity Quota Hub -->
       <div class="service-card" id="homeAgyCard">
         <div class="service-head">
-          <div class="service-icon icon-agy">⚡</div>
+          <div class="service-icon icon-agy">🔮</div>
           <div>
             <h3>Antigravity Quotas</h3>
             <p class="muted">5h + weekly LLM quota pools across accounts</p>
@@ -91,7 +137,58 @@ export async function renderHome(container: HTMLElement): Promise<void> {
     </div>
   `;
 
-  // Fetch live stats in background
+  // 1. Fetch Tasks Preview
+  try {
+    const taskRes = await fetchTasks('cpu', 'desc', 4);
+    const pill = container.querySelector('#homeTasksPill') as HTMLElement;
+    if (pill) {
+      pill.textContent = `${taskRes.overview.total_processes} Procs (${taskRes.overview.cpu_total_percent.toFixed(0)}% CPU)`;
+    }
+    const preview = container.querySelector('#homeTasksPreview') as HTMLElement;
+    if (preview) {
+      preview.innerHTML = taskRes.tasks.map((t) => `
+        <div class="home-c-row">
+          <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
+            <code style="font-size:0.75rem;color:var(--text-muted);">${t.pid}</code>
+            <strong style="font-size:0.85rem;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${esc(t.name)}</strong>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <span class="c-pill" style="color:var(--primary)">${t.cpu_percent.toFixed(1)}%</span>
+            <span class="c-pill">${esc(t.memory_formatted)}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.warn('Home tasks fetch error', err);
+  }
+
+  // 2. Fetch Services Preview
+  try {
+    const svcsRes = await fetchServices('all', 'all', 'ram', 'desc', 4);
+    const pill = container.querySelector('#homeSvcsPill') as HTMLElement;
+    if (pill) {
+      pill.textContent = `${svcsRes.overview.running_services} Active (${svcsRes.overview.total_memory_formatted})`;
+    }
+    const preview = container.querySelector('#homeSvcsPreview') as HTMLElement;
+    if (preview) {
+      preview.innerHTML = svcsRes.services.map((s) => `
+        <div class="home-c-row">
+          <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
+            <span class="badge-scope scope-${s.scope}" style="font-size:0.65rem;padding:1px 4px;">${s.scope}</span>
+            <strong style="font-size:0.85rem;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${esc(s.name)}</strong>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <span class="c-pill">${esc(s.memory_formatted)}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.warn('Home services fetch error', err);
+  }
+
+  // 3. Fetch System Vitals
   try {
     const sys = await fetchSystemMetrics();
     const sysPill = container.querySelector('#homeSysPill') as HTMLElement;
@@ -113,14 +210,17 @@ export async function renderHome(container: HTMLElement): Promise<void> {
       diskG.innerHTML = renderDonutGauge(sys.disk.used_percent, { size: 76, strokeWidth: 7, label: 'DISK', color: '#10b981' });
     }
 
-    (container.querySelector('#hMetaHost') as HTMLElement).textContent = sys.host.hostname || 'localhost';
-    (container.querySelector('#hMetaUptime') as HTMLElement).textContent = formatUptime(sys.host.uptime_seconds);
-    (container.querySelector('#hMetaLoad') as HTMLElement).textContent = (sys.load_avg || []).join(' · ') || '0.0';
+    const hostEl = container.querySelector('#hMetaHost') as HTMLElement;
+    if (hostEl) hostEl.textContent = sys.host.hostname || 'localhost';
+    const upEl = container.querySelector('#hMetaUptime') as HTMLElement;
+    if (upEl) upEl.textContent = formatUptime(sys.host.uptime_seconds);
+    const loadEl = container.querySelector('#hMetaLoad') as HTMLElement;
+    if (loadEl) loadEl.textContent = (sys.load_avg || []).join(' · ') || '0.0';
   } catch (err) {
     console.warn('Home sys fetch error', err);
   }
 
-  // Fetch containers preview
+  // 4. Fetch containers preview
   try {
     const data = await fetchContainers();
     const list = data.containers || [];
@@ -154,7 +254,7 @@ export async function renderHome(container: HTMLElement): Promise<void> {
     console.warn('Home dock fetch error', err);
   }
 
-  // Fetch Antigravity preview
+  // 5. Fetch Antigravity preview
   try {
     const data = await fetchLimits(false);
     const accs = data.accounts || [];
