@@ -62,3 +62,18 @@ def test_api_system_history_endpoint():
     data = response.json()
     assert "history" in data
     assert isinstance(data["history"], list)
+
+
+def test_api_system_history_with_hours_query():
+    response = client.get("/api/system/history?hours=1&limit=60")
+    assert response.status_code == 200
+    data = response.json()
+    assert "history" in data
+    assert isinstance(data["history"], list)
+
+
+def test_system_host_info_enrichment():
+    svc = get_system_service()
+    snap = svc.get_current_snapshot()
+    assert hasattr(snap.host, "cpu_model")
+    assert hasattr(snap.host, "distro")

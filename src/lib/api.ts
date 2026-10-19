@@ -118,6 +118,9 @@ export interface HostInfo {
   uptime_seconds: number;
   boot_time: string;
   process_count: number;
+  cpu_model?: string;
+  distro?: string;
+  ip_address?: string;
 }
 
 export interface SystemSnapshot {
@@ -132,12 +135,21 @@ export interface SystemSnapshot {
 
 export interface SystemHistoryPoint {
   timestamp: string;
+  timestamp_epoch?: number;
   cpu: number;
   memory: number;
+  memory_used_bytes?: number;
+  memory_total_bytes?: number;
+  swap?: number;
+  swap_used_percent?: number;
+  disk_used_percent?: number;
   disk_read_kb: number;
   disk_write_kb: number;
   net_rx_kb: number;
   net_tx_kb: number;
+  load_1m?: number;
+  load_5m?: number;
+  load_15m?: number;
 }
 
 export interface MetricStatRange {
@@ -170,8 +182,11 @@ export async function fetchSystemMetrics(): Promise<SystemSnapshot> {
   return res.json();
 }
 
-export async function fetchSystemHistory(): Promise<{ history: SystemHistoryPoint[] }> {
-  const res = await fetch(`${getApiBase()}/api/system/history`);
+export async function fetchSystemHistory(hours?: number, limit = 120): Promise<{ history: SystemHistoryPoint[] }> {
+  const params = new URLSearchParams();
+  if (hours !== undefined) params.set('hours', String(hours));
+  params.set('limit', String(limit));
+  const res = await fetch(`${getApiBase()}/api/system/history?${params}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }

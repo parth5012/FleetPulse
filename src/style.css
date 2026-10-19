@@ -2830,3 +2830,259 @@ button, input, select {
   justify-content: flex-end;
   margin-top: 6px;
 }
+
+/* ---------------------------------------------------------------------------
+   Beszel-Style High-Fidelity Charts & Dashboard View
+--------------------------------------------------------------------------- */
+.beszel-host-header {
+  margin-bottom: 20px;
+}
+
+.beszel-host-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.beszel-host-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.beszel-host-name {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.beszel-status-up {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.beszel-meta-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.82rem;
+  color: #a1a1aa;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.beszel-meta-chips .chip-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.beszel-meta-chips .chip-icon {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.beszel-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.beszel-time-dropdown-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #16161a;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 5px 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.beszel-select {
+  background: transparent;
+  color: #e4e4e7;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.beszel-select option {
+  background: #18181c;
+  color: #ffffff;
+}
+
+.beszel-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #16161a;
+  border: 1px solid var(--card-border);
+  cursor: pointer;
+  color: #a1a1aa;
+  font-size: 1rem;
+  transition: all 0.15s ease;
+}
+
+.beszel-icon-btn:hover {
+  background: #202026;
+  color: #ffffff;
+}
+
+.beszel-subnav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 22px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 10px;
+}
+
+.beszel-subnav::-webkit-scrollbar {
+  display: none;
+}
+
+.beszel-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #a1a1aa;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.beszel-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #ffffff;
+}
+
+.beszel-tab.active {
+  background: #18181c;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.beszel-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 960px) {
+  .beszel-charts-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
+.beszel-chart-card {
+  background: #121215;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28);
+  transition: border-color 0.2s ease;
+}
+
+.beszel-chart-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.beszel-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.beszel-chart-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 3px 0;
+  letter-spacing: -0.01em;
+}
+
+.beszel-chart-subtitle {
+  font-size: 0.8rem;
+  color: #71717a;
+  margin: 0;
+}
+
+.beszel-more-btn {
+  background: transparent;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.beszel-more-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.beszel-chart-body {
+  width: 100%;
+  overflow: hidden;
+}
+
+.beszel-svg {
+  width: 100%;
+  display: block;
+}
+
+.beszel-legend {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+}
+
+.legend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #a1a1aa;
+}
+
+.legend-badge .swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}

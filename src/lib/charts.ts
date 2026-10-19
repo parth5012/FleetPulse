@@ -360,3 +360,215 @@ export function renderAreaChart(series: ChartSeries[], options: AreaChartOptions
     </div>
   `;
 }
+
+// ---------------------------------------------------------------------------
+// High-Fidelity Beszel-Style Chart Component
+// ---------------------------------------------------------------------------
+export interface BeszelSeries {
+  name: string;
+  color: string;
+  values: number[];
+  gradient?: boolean;
+}
+
+export interface BeszelChartOptions {
+  title: string;
+  subtitle?: string;
+  timestamps?: string[];
+  unit?: string;
+  yMin?: number;
+  yMax?: number;
+  height?: number;
+  decimals?: number;
+  legend?: boolean;
+  moreMenu?: boolean;
+}
+
+function formatChartTime(ts: string): string {
+  if (!ts) return '';
+  if (ts.includes('AM') || ts.includes('PM')) return ts;
+  try {
+    const d = new Date(ts);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+  } catch {
+    // fallback
+  }
+  return ts.length > 8 ? ts.substring(11, 16) : ts;
+}
+
+export function renderBeszelChart(
+  series: BeszelSeries[],
+  options: BeszelChartOptions
+): string {
+  const width = 640;
+  const height = options.height || 215;
+  const paddingLeft = 52;
+  const paddingRight = 16;
+  const paddingTop = 16;
+  const paddingBottom = 30;
+
+  const drawWidth = width - paddingLeft - paddingRight;
+  const drawHeight = height - paddingTop - paddingBottom;
+  const baseline = paddingTop + drawHeight;
+
+  // Find max value across series
+  let maxVal = options.yMax !== undefined ? options.yMax : 0;
+  let minVal = options.yMin !== undefined ? options.yMin : 0;
+
+  if (options.yMax === undefined) {
+    let peak = 0;
+    series.forEach((s) => {
+      s.values.forEach((v) => {
+        if (v > peak) peak = v;
+      });
+    });
+
+    if (options.unit === '%') {
+      maxVal = peak > 85 ? 100 : peak > 45 ? 60 : peak > 25 ? 40 : peak > 15 ? 20 : 10;
+    } else if (options.unit === 'GB') {
+      maxVal = Math.max(1, Math.ceil(peak * 1.15 * 10) / 10);
+    } else if (!options.unit || options.unit === '') {
+      // Load average
+      maxVal = Math.max(1.0, Math.ceil(peak * 1.25 * 10) / 10);
+    } else {
+      maxVal = Math.max(10, Math.ceil(peak * 1.2));
+    }
+  }
+
+  const range = maxVal - minVal || 1;
+  const gridSteps = 4;
+  let gridSvg = '';
+
+  for (let i = 0; i <= gridSteps; i++) {
+    const fraction = i / gridSteps;
+    const y = paddingTop + (1 - fraction) * drawHeight;
+    const rawVal = minVal + fraction * range;
+
+    let valLabel = '';
+    if (options.unit === '%') {
+      valLabel = `${Math.round(rawVal)}%`;
+    } else if (options.unit === 'GB') {
+      valLabel = `${rawVal.toFixed(1)} GB`;
+    } else if (options.unit) {
+      valLabel = `${Math.round(rawVal)} ${options.unit}`;
+    } else {
+      valLabel = rawVal < 10 ? rawVal.toFixed(1) : Math.round(rawVal).toString();
+    }
+
+    gridSvg += `
+      <line x1="${paddingLeft}" y1="${y.toFixed(1)}" x2="${width - paddingRight}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3,3" />
+      <text x="${paddingLeft - 8}" y="${(y + 3.5).toFixed(1)}" fill="#71717a" font-size="9.5" text-anchor="end" font-family="var(--font-mono)">${valLabel}</text>
+    `;
+  }
+
+  // Draw series paths
+  let seriesSvg = '';
+  const seriesCount = series.length;
+
+  series.forEach((s, idx) => {
+    const vals = s.values;
+    if (vals.length === 0) return;
+
+    const points = vals.map((v, i) => {
+      const x = paddingLeft + (vals.length > 1 ? (i / (vals.length - 1)) * drawWidth : drawWidth / 2);
+      const normalized = Math.max(0, Math.min(1, (v - minVal) / range));
+      const y = paddingTop + (1 - normalized) * drawHeight;
+      return { x, y };
+    });
+
+    const linePath = createSmoothPath(points);
+    const gradId = `beszel-grad-${idx}-${Math.random().toString(36).substring(2, 7)}`;
+    const lastPoint = points[points.length - 1];
+    const firstPoint = points[0];
+
+    const showGradient = s.gradient !== false && (seriesCount === 1 || s.gradient === true);
+
+    if (showGradient && points.length > 1) {
+      const areaPath = `${linePath} L ${lastPoint.x.toFixed(1)} ${baseline.toFixed(1)} L ${firstPoint.x.toFixed(1)} ${baseline.toFixed(1)} Z`;
+      seriesSvg += `
+        <defs>
+          <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${s.color}" stop-opacity="0.32" />
+            <stop offset="100%" stop-color="${s.color}" stop-opacity="0.01" />
+          </linearGradient>
+        </defs>
+        <path d="${areaPath}" fill="url(#${gradId})" />
+      `;
+    }
+
+    seriesSvg += `
+      <path d="${linePath}" fill="none" stroke="${s.color}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+    `;
+  });
+
+  // Draw X-axis timestamps
+  let xAxisSvg = '';
+  const timestamps = options.timestamps || [];
+  if (timestamps.length > 0) {
+    const labelCount = Math.min(6, timestamps.length);
+    const indices: number[] = [];
+
+    if (labelCount === 1) {
+      indices.push(0);
+    } else {
+      for (let j = 0; j < labelCount; j++) {
+        indices.push(Math.round((j * (timestamps.length - 1)) / (labelCount - 1)));
+      }
+    }
+
+    // Baseline axis tick line
+    xAxisSvg += `<line x1="${paddingLeft}" y1="${baseline}" x2="${width - paddingRight}" y2="${baseline}" stroke="rgba(255,255,255,0.08)" />`;
+
+    indices.forEach((idx) => {
+      const ts = timestamps[idx];
+      const x = paddingLeft + (timestamps.length > 1 ? (idx / (timestamps.length - 1)) * drawWidth : drawWidth / 2);
+      xAxisSvg += `
+        <line x1="${x.toFixed(1)}" y1="${baseline}" x2="${x.toFixed(1)}" y2="${(baseline + 4).toFixed(1)}" stroke="rgba(255,255,255,0.15)" />
+        <text x="${x.toFixed(1)}" y="${(baseline + 16).toFixed(1)}" fill="#71717a" font-size="9.5" text-anchor="middle" font-family="var(--font-mono)">${formatChartTime(ts)}</text>
+      `;
+    });
+  }
+
+  // Legend HTML
+  const hasLegend = options.legend !== false && series.length > 1;
+  const legendHtml = hasLegend
+    ? `
+      <div class="beszel-legend">
+        ${series
+          .map(
+            (s) => `
+          <div class="legend-badge">
+            <span class="swatch" style="background:${s.color};"></span>
+            <span>${s.name}</span>
+          </div>
+        `
+          )
+          .join('')}
+      </div>
+    `
+    : '';
+
+  return `
+    <div class="beszel-chart-card">
+      <div class="beszel-chart-header">
+        <div>
+          <h3 class="beszel-chart-title">${options.title}</h3>
+          ${options.subtitle ? `<div class="beszel-chart-subtitle">${options.subtitle}</div>` : ''}
+        </div>
+        <button class="beszel-more-btn" title="Options">•••</button>
+      </div>
+
+      <div class="beszel-chart-body">
+        <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="beszel-svg">
+          ${gridSvg}
+          ${xAxisSvg}
+          ${seriesSvg}
+        </svg>
+      </div>
+
+      ${legendHtml}
+    </div>
+  `;
+}

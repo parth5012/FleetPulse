@@ -206,39 +206,58 @@ class MetricsDatabase:
                 },
             }
 
-    def get_recent_history(self, limit: int = 60, hours: Optional[float] = None) -> List[Dict[str, Any]]:
-        """Retrieve recent historical data points for chart rendering."""
+    def get_recent_history(self, limit: int = 120, hours: Optional[float] = None) -> List[Dict[str, Any]]:
+        """Retrieve recent historical data points for chart rendering with optional timeframe."""
         query = "SELECT * FROM system_metrics"
         params: List[Any] = []
 
         if hours is not None:
             since_epoch = time.time() - (hours * 3600.0)
-            query += " WHERE timestamp_epoch >= ?"
+            query += " WHERE timestamp_epoch >= ? ORDER BY timestamp_epoch ASC"
             params.append(since_epoch)
 
-        query += " ORDER BY timestamp_epoch DESC LIMIT ?"
-        params.append(limit)
+            with self._lock:
+                cursor = self._conn.cursor()
+                cursor.execute(query, params)
+                all_rows = cursor.fetchall()
 
-        with self._lock:
-            cursor = self._conn.cursor()
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
+            if len(all_rows) > limit:
+                step = max(1, len(all_rows) // limit)
+                selected_rows = all_rows[::step]
+                # Ensure the most recent point is always included
+                if all_rows[-1] not in selected_rows:
+                    selected_rows.append(all_rows[-1])
+            else:
+                selected_rows = all_rows
+        else:
+            query += " ORDER BY timestamp_epoch DESC LIMIT ?"
+            params.append(limit)
 
-        # Reverse to return ascending chronological order for charts
+            with self._lock:
+                cursor = self._conn.cursor()
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+            selected_rows = list(reversed(rows))
+
         result = []
-        for r in reversed(rows):
+        for r in selected_rows:
             result.append(
                 {
                     "timestamp": r["timestamp"],
-                    "cpu": r["cpu_percent"],
-                    "memory": r["memory_used_percent"],
-                    "disk_read_kb": r["disk_read_kb"],
-                    "disk_write_kb": r["disk_write_kb"],
-                    "net_rx_kb": r["net_rx_kb"],
-                    "net_tx_kb": r["net_tx_kb"],
-                    "load_1m": r["load_1m"],
-                    "load_5m": r["load_5m"],
-                    "load_15m": r["load_15m"],
+                    "timestamp_epoch": r["timestamp_epoch"] if "timestamp_epoch" in r.keys() else 0.0,
+                    "cpu": float(r["cpu_percent"]),
+                    "memory": float(r["memory_used_percent"]),
+                    "memory_used_bytes": int(r["memory_used_bytes"]) if "memory_used_bytes" in r.keys() else 0,
+                    "memory_total_bytes": int(r["memory_total_bytes"]) if "memory_total_bytes" in r.keys() else 0,
+                    "swap": float(r["swap_used_percent"]) if "swap_used_percent" in r.keys() else 0.0,
+                    "disk_used_percent": float(r["disk_used_percent"]) if "disk_used_percent" in r.keys() else 0.0,
+                    "disk_read_kb": float(r["disk_read_kb"]),
+                    "disk_write_kb": float(r["disk_write_kb"]),
+                    "net_rx_kb": float(r["net_rx_kb"]),
+                    "net_tx_kb": float(r["net_tx_kb"]),
+                    "load_1m": float(r["load_1m"]),
+                    "load_5m": float(r["load_5m"]),
+                    "load_15m": float(r["load_15m"]),
                 }
             )
         return result

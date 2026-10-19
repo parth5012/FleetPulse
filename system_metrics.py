@@ -6,7 +6,9 @@ Maintains a rolling historical ring buffer for time-series charts and sparklines
 
 import collections
 import os
+from pathlib import Path
 import platform
+import socket
 import sys
 import threading
 import time
@@ -77,6 +79,9 @@ class HostInfo(BaseModel):
     uptime_seconds: int = 0
     boot_time: str = ""
     process_count: int = 0
+    cpu_model: str = ""
+    distro: str = ""
+    ip_address: str = ""
 
 
 class SystemSnapshot(BaseModel):
@@ -93,10 +98,16 @@ class SystemHistoryPoint(BaseModel):
     timestamp: str
     cpu: float
     memory: float
-    disk_read_kb: float
-    disk_write_kb: float
-    net_rx_kb: float
-    net_tx_kb: float
+    disk_read_kb: float = 0.0
+    disk_write_kb: float = 0.0
+    net_rx_kb: float = 0.0
+    net_tx_kb: float = 0.0
+    load_1m: float = 0.0
+    load_5m: float = 0.0
+    load_15m: float = 0.0
+    memory_used_bytes: int = 0
+    memory_total_bytes: int = 0
+    swap_used_percent: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +222,44 @@ class SystemMetricsService:
         except Exception:
             pass
 
+        # CPU Model
+        cpu_model = ""
+        cpuinfo = Path("/proc/cpuinfo")
+        if cpuinfo.exists():
+            try:
+                for line in cpuinfo.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    if line.startswith("model name"):
+                        cpu_model = line.split(":", 1)[1].strip()
+                        break
+            except Exception:
+                pass
+        if not cpu_model:
+            cpu_model = platform.processor() or "CPU"
+
+        # Distro Pretty Name
+        distro = ""
+        os_release = Path("/etc/os-release")
+        if os_release.exists():
+            try:
+                for line in os_release.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    if line.startswith("PRETTY_NAME="):
+                        distro = line.split("=", 1)[1].strip("\"'")
+                        break
+            except Exception:
+                pass
+        if not distro:
+            distro = f"{platform.system()} {platform.release()}"
+
+        # Primary / Tailscale IP
+        primary_ip = ""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("10.255.255.255", 1))
+            primary_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            primary_ip = "127.0.0.1"
+
         return HostInfo(
             hostname=platform.node() or "localhost",
             platform=platform.system() or "Linux",
@@ -220,6 +269,9 @@ class SystemMetricsService:
             uptime_seconds=uptime,
             boot_time=boot_iso,
             process_count=proc_count,
+            cpu_model=cpu_model,
+            distro=distro,
+            ip_address=primary_ip,
         )
 
     def collect_snapshot(self) -> SystemSnapshot:
@@ -387,6 +439,12 @@ class SystemMetricsService:
                     disk_write_kb=disk_write_kb,
                     net_rx_kb=net_rx_kb,
                     net_tx_kb=net_tx_kb,
+                    load_1m=load_avg[0] if len(load_avg) > 0 else 0.0,
+                    load_5m=load_avg[1] if len(load_avg) > 1 else 0.0,
+                    load_15m=load_avg[2] if len(load_avg) > 2 else 0.0,
+                    memory_used_bytes=mem_metrics.used_bytes,
+                    memory_total_bytes=mem_metrics.total_bytes,
+                    swap_used_percent=mem_metrics.swap_used_percent,
                 ).model_dump()
             )
 
@@ -395,12 +453,17 @@ class SystemMetricsService:
     def get_current_snapshot(self) -> SystemSnapshot:
         return self.collect_snapshot()
 
-    def get_history(self) -> List[Dict[str, Any]]:
+    def get_history(self, hours: Optional[float] = None, limit: int = 120) -> List[Dict[str, Any]]:
+        if hours is not None:
+            try:
+                return self.db.get_recent_history(limit=limit, hours=hours)
+            except Exception:
+                pass
         with self._lock:
             if len(self._history) > 0:
                 return list(self._history)
         try:
-            return self.db.get_recent_history(limit=self.history_size)
+            return self.db.get_recent_history(limit=limit)
         except Exception:
             return []
 
@@ -438,10 +501,13 @@ async def get_system_stats(hours: float = Query(24.0, ge=0.1, le=720.0)):
 
 
 @router.get("/history")
-async def get_system_history():
+async def get_system_history(
+    hours: Optional[float] = Query(None, ge=0.05, le=720.0),
+    limit: int = Query(120, ge=10, le=500),
+):
     """Retrieve rolling time-series data points for Beszel-style interactive charts."""
     service = get_system_service()
-    return {"history": service.get_history()}
+    return {"history": service.get_history(hours=hours, limit=limit)}
 
 
 @router.get("/stream")
