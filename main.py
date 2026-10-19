@@ -7,6 +7,9 @@ from fastapi.staticfiles import StaticFiles
 
 from antigravity import router as antigravity_router
 from containers import router as containers_router
+from journal_inspector import router as journal_router
+from maintenance import router as maintenance_router
+from network_inspector import router as network_router
 from system_metrics import router as system_router
 from system_services import router as services_router
 from tasks import router as tasks_router
@@ -22,6 +25,9 @@ app.include_router(system_router)
 app.include_router(containers_router)
 app.include_router(tasks_router)
 app.include_router(services_router)
+app.include_router(network_router)
+app.include_router(journal_router)
+app.include_router(maintenance_router)
 
 # Mount API routers under /dashboard prefix for reverse proxy / path prefix setups
 app.include_router(antigravity_router, prefix="/dashboard")
@@ -29,6 +35,9 @@ app.include_router(system_router, prefix="/dashboard")
 app.include_router(containers_router, prefix="/dashboard")
 app.include_router(tasks_router, prefix="/dashboard")
 app.include_router(services_router, prefix="/dashboard")
+app.include_router(network_router, prefix="/dashboard")
+app.include_router(journal_router, prefix="/dashboard")
+app.include_router(maintenance_router, prefix="/dashboard")
 
 
 # Static & PWA file handling

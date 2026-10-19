@@ -382,3 +382,197 @@ export async function triggerServiceAction(
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Network Inspector (Tailscale & Listening Sockets)
+// ---------------------------------------------------------------------------
+export interface TailscaleNode {
+  hostname: string;
+  dns_name: string;
+  tailscale_ips: string[];
+  os: string;
+  online: boolean;
+  rx_bytes?: number;
+  tx_bytes?: number;
+}
+
+export interface TailscalePeer extends TailscaleNode {
+  cur_addr: string;
+  relay: string;
+  is_direct: boolean;
+  last_seen?: string | null;
+  last_handshake?: string | null;
+}
+
+export interface TailscaleServeRoute {
+  host: string;
+  port: number;
+  path: string;
+  proxy_target: string;
+}
+
+export interface TailscaleStatusResponse {
+  installed: boolean;
+  backend_state: string;
+  self_node: TailscaleNode;
+  peers: TailscalePeer[];
+  peer_count: number;
+  serve_routes: TailscaleServeRoute[];
+}
+
+export interface SocketPort {
+  protocol: 'tcp' | 'udp';
+  state: string;
+  local_address: string;
+  port: number;
+  exposure: 'localhost' | 'tailscale' | 'public';
+  process: string;
+  pid: number | null;
+}
+
+export interface PortsResponse {
+  ports: SocketPort[];
+  count: number;
+}
+
+export async function fetchTailscaleStatus(): Promise<TailscaleStatusResponse> {
+  const res = await fetch(`${getApiBase()}/api/network/tailscale`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchListeningPorts(): Promise<PortsResponse> {
+  const res = await fetch(`${getApiBase()}/api/network/ports`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// System Journal & Kernel Watcher
+// ---------------------------------------------------------------------------
+export interface JournalEntry {
+  timestamp: string;
+  priority_num: number;
+  priority_label: string;
+  unit: string;
+  pid: number | null;
+  message: string;
+}
+
+export interface JournalLogsResponse {
+  logs: JournalEntry[];
+  total: number;
+  scope: string;
+  unit?: string | null;
+  priority?: string | null;
+}
+
+export interface PSIMetrics {
+  avg10?: number;
+  avg60?: number;
+  avg300?: number;
+  total?: number;
+}
+
+export interface KernelHealthResponse {
+  oom_kill_count: number;
+  memory_pressure: {
+    some?: PSIMetrics;
+    full?: PSIMetrics;
+  };
+  cpu_pressure: {
+    some?: PSIMetrics;
+    full?: PSIMetrics;
+  };
+  io_pressure?: {
+    some?: PSIMetrics;
+    full?: PSIMetrics;
+  };
+}
+
+export async function fetchJournalLogs(
+  scope = 'user',
+  unit?: string,
+  priority?: string,
+  search?: string,
+  limit = 100
+): Promise<JournalLogsResponse> {
+  const params = new URLSearchParams({ scope, limit: String(limit) });
+  if (unit) params.set('unit', unit);
+  if (priority) params.set('priority', priority);
+  if (search) params.set('search', search);
+
+  const res = await fetch(`${getApiBase()}/api/journal/logs?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchKernelHealth(): Promise<KernelHealthResponse> {
+  const res = await fetch(`${getApiBase()}/api/journal/kernel`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Remote Maintenance & Shortcuts
+// ---------------------------------------------------------------------------
+export interface DockerDfItem {
+  type: string;
+  total: string;
+  active: string;
+  size: string;
+  reclaimable: string;
+}
+
+export interface DiskRootDf {
+  total_bytes: number;
+  used_bytes: number;
+  free_bytes: number;
+  used_percent: number;
+}
+
+export interface MaintenanceDfResponse {
+  docker: DockerDfItem[];
+  disk_root: DiskRootDf;
+}
+
+export async function fetchMaintenanceDf(): Promise<MaintenanceDfResponse> {
+  const res = await fetch(`${getApiBase()}/api/maintenance/df`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function triggerDockerPrune(): Promise<{ success: boolean; reclaimed_space: string; output: string }> {
+  const res = await fetch(`${getApiBase()}/api/maintenance/docker/prune`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function triggerJournalVacuum(time = '3d'): Promise<{ success: boolean; output: string }> {
+  const res = await fetch(`${getApiBase()}/api/maintenance/journal/vacuum`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ time }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function triggerServiceRestartShortcut(unit: string): Promise<{ success: boolean; unit: string; message: string }> {
+  const res = await fetch(`${getApiBase()}/api/maintenance/services/restart`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ unit }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}

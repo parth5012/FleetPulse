@@ -301,8 +301,16 @@ button, input, select {
     -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--card-border);
     z-index: 999;
-    justify-content: space-around;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
     align-items: center;
+  }
+
+  .mobile-bottom-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .mobile-bottom-nav .nav-item {
@@ -310,7 +318,9 @@ button, input, select {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    flex: 1;
+    flex: 1 0 auto;
+    min-width: 54px;
+    padding: 0 4px;
     min-height: 48px;
     height: 100%;
     color: var(--text-muted);
@@ -2408,4 +2418,415 @@ button, input, select {
   color: var(--danger);
   margin-bottom: 16px;
   font-size: 0.85rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Network Inspector & Tailscale Mesh Styles
+--------------------------------------------------------------------------- */
+.network-mesh-section,
+.serve-routes-section,
+.sockets-section {
+  margin-bottom: 24px;
+}
+
+.mesh-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.mesh-node-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.15s ease;
+}
+
+.mesh-node-card:hover {
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.mesh-node-card.self-card {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(18, 18, 21, 0.95) 100%);
+}
+
+.mesh-node-card.node-offline {
+  opacity: 0.65;
+  filter: grayscale(0.5);
+}
+
+.node-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.node-ip {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: #10b981;
+  font-weight: 700;
+}
+
+.node-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.node-meta .lbl {
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.serve-routes-table-wrap,
+.sockets-table-wrap {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.sockets-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.sockets-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------------------
+   System Journal & Kernel PSI Watcher Styles
+--------------------------------------------------------------------------- */
+.kernel-watcher-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.kernel-watcher-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.kernel-pressure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.pressure-tile {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tile-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tile-val {
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.tile-sub {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.journal-controls-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.journal-controls-left,
+.journal-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.journal-console-wrap {
+  background: #060608;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+.log-stream-console {
+  max-height: 580px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.journal-line {
+  display: flex;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  align-items: baseline;
+  word-break: break-all;
+}
+
+.journal-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.j-time {
+  color: #71717a;
+  flex-shrink: 0;
+  font-size: 0.72rem;
+}
+
+.j-prio {
+  font-weight: 700;
+  font-size: 0.68rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.j-prio.j-error, .journal-line.j-error .j-msg {
+  color: #ef4444;
+}
+.j-prio.j-error {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.j-prio.j-warn, .journal-line.j-warn .j-msg {
+  color: #f59e0b;
+}
+.j-prio.j-warn {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.j-prio.j-info, .journal-line.j-info .j-msg {
+  color: #d4d4d8;
+}
+.j-prio.j-info {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.j-prio.j-debug, .journal-line.j-debug .j-msg {
+  color: #a1a1aa;
+}
+.j-prio.j-debug {
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+}
+
+.j-unit {
+  color: #a855f7;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.j-msg {
+  flex: 1;
+}
+
+/* ---------------------------------------------------------------------------
+   Remote Maintenance Hub & Action Buttons
+--------------------------------------------------------------------------- */
+.maint-alert {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.maint-alert.alert-success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.maint-alert.alert-error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.maintenance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.maint-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.maint-card-head {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.maint-card-head h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.maint-icon {
+  font-size: 1.5rem;
+}
+
+.maint-card-body {
+  padding: 18px;
+  flex: 1;
+}
+
+.maint-card-foot {
+  padding: 14px 18px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid var(--card-border);
+}
+
+.docker-df-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 480px) {
+  .docker-df-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+.df-tile {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.df-tile-title {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.df-tile-size {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.df-tile-reclaim {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.services-shortcuts-section {
+  margin-bottom: 24px;
+}
+
+.daemon-shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.daemon-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.daemon-card .d-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.daemon-card .d-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.daemon-card .d-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
 }

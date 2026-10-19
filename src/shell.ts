@@ -18,8 +18,11 @@ export function renderShell(root: HTMLElement): void {
           <a href="#/tasks" data-route="/tasks">⚡ Tasks</a>
           <a href="#/services" data-route="/services">⚙️ Services</a>
           <a href="#/system" data-route="/system">🖥️ System</a>
+          <a href="#/network" data-route="/network">🌐 Network</a>
+          <a href="#/journal" data-route="/journal">📜 Journal</a>
+          <a href="#/maintenance" data-route="/maintenance">🛠️ Maintenance</a>
           <a href="#/containers" data-route="/containers">🐳 Containers</a>
-          <a href="#/antigravity" data-route="/antigravity">🔮 Antigravity</a>
+          <a href="#/antigravity" data-route="/antigravity">🔮 Quotas</a>
         </nav>
 
         <div class="header-right">
@@ -48,11 +51,23 @@ export function renderShell(root: HTMLElement): void {
         </a>
         <a href="#/services" data-route="/services" class="nav-item">
           <span class="nav-icon">⚙️</span>
-          <span class="nav-label">Services</span>
+          <span class="nav-label">Svcs</span>
         </a>
         <a href="#/system" data-route="/system" class="nav-item">
           <span class="nav-icon">🖥️</span>
           <span class="nav-label">System</span>
+        </a>
+        <a href="#/network" data-route="/network" class="nav-item">
+          <span class="nav-icon">🌐</span>
+          <span class="nav-label">Net</span>
+        </a>
+        <a href="#/journal" data-route="/journal" class="nav-item">
+          <span class="nav-icon">📜</span>
+          <span class="nav-label">Logs</span>
+        </a>
+        <a href="#/maintenance" data-route="/maintenance" class="nav-item">
+          <span class="nav-icon">🛠️</span>
+          <span class="nav-label">Maint</span>
         </a>
         <a href="#/containers" data-route="/containers" class="nav-item">
           <span class="nav-icon">🐳</span>

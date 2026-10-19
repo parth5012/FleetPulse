@@ -11,6 +11,10 @@ import {
   fetchLimits,
   fetchTasks,
   fetchServices,
+  fetchTailscaleStatus,
+  fetchListeningPorts,
+  fetchKernelHealth,
+  fetchMaintenanceDf,
 } from '../lib/api';
 import { formatBytes, formatUptime, esc } from '../lib/format';
 import { renderDonutGauge } from '../lib/charts';
@@ -135,6 +139,66 @@ export async function renderHome(container: HTMLElement): Promise<void> {
         </div>
         <div class="service-foot">
           <a href="#/antigravity" class="btn btn-primary" style="width:100%;justify-content:center;">Open Quota Dashboard →</a>
+        </div>
+      </div>
+
+      <!-- Card 6: Tailscale & Network Health -->
+      <div class="service-card" id="homeNetCard">
+        <div class="service-head">
+          <div class="service-icon icon-tasks">🌐</div>
+          <div>
+            <h3>Network & Tailscale Inspector</h3>
+            <p class="muted">Live mesh topology, WireGuard vs DERP & open sockets</p>
+          </div>
+          <span class="pill pill-live" id="homeNetPill">Auditing...</span>
+        </div>
+        <div class="service-body">
+          <div id="homeNetPreview">
+            <div class="loading-state" style="padding: 12px;"><div class="spin">⚡</div></div>
+          </div>
+        </div>
+        <div class="service-foot">
+          <a href="#/network" class="btn btn-primary" style="width:100%;justify-content:center;">Inspect Network →</a>
+        </div>
+      </div>
+
+      <!-- Card 7: System Journal & Kernel Watcher -->
+      <div class="service-card" id="homeJournalCard">
+        <div class="service-head">
+          <div class="service-icon icon-svcs">📜</div>
+          <div>
+            <h3>System Journal & Kernel Watcher</h3>
+            <p class="muted">OOM killer events, Linux PSI stalls & systemd logs</p>
+          </div>
+          <span class="pill pill-live" id="homeJournalPill">Watching...</span>
+        </div>
+        <div class="service-body">
+          <div id="homeJournalPreview">
+            <div class="loading-state" style="padding: 12px;"><div class="spin">⚡</div></div>
+          </div>
+        </div>
+        <div class="service-foot">
+          <a href="#/journal" class="btn btn-primary" style="width:100%;justify-content:center;">View Host Logs →</a>
+        </div>
+      </div>
+
+      <!-- Card 8: One-Tap Maintenance Hub -->
+      <div class="service-card" id="homeMaintCard">
+        <div class="service-head">
+          <div class="service-icon icon-dock">🛠️</div>
+          <div>
+            <h3>Remote Maintenance & Actions</h3>
+            <p class="muted">Docker prune, journal vacuum & daemon restart shortcuts</p>
+          </div>
+          <span class="pill" id="homeMaintPill">Console</span>
+        </div>
+        <div class="service-body">
+          <div id="homeMaintPreview">
+            <div class="loading-state" style="padding: 12px;"><div class="spin">⚡</div></div>
+          </div>
+        </div>
+        <div class="service-foot">
+          <a href="#/maintenance" class="btn btn-primary" style="width:100%;justify-content:center;">Admin Console →</a>
         </div>
       </div>
     </div>
@@ -364,5 +428,129 @@ export async function renderHome(container: HTMLElement): Promise<void> {
     }
   } catch (err) {
     console.warn('Home agy fetch error', err);
+  }
+
+  // 6. Fetch Network Preview
+  try {
+    const [tailData, portsData] = await Promise.allSettled([
+      fetchTailscaleStatus(),
+      fetchListeningPorts(),
+    ]);
+
+    const netPill = container.querySelector('#homeNetPill') as HTMLElement;
+    const netPreview = container.querySelector('#homeNetPreview') as HTMLElement;
+
+    if (netPreview) {
+      const isTailOk = tailData.status === 'fulfilled' && tailData.value.installed && tailData.value.backend_state === 'Running';
+      const peerCount = isTailOk ? tailData.value.peer_count : 0;
+      const portCount = portsData.status === 'fulfilled' ? portsData.value.count : 0;
+      const directCount = isTailOk ? tailData.value.peers.filter((p) => p.is_direct).length : 0;
+
+      if (netPill) {
+        netPill.textContent = `${peerCount} Peers · ${portCount} Sockets`;
+      }
+
+      netPreview.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="home-c-row">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="status-dot ${isTailOk ? 'status-green' : 'status-gray'}"></span>
+              <strong>Tailscale WireGuard Mesh</strong>
+            </div>
+            <span class="badge ${isTailOk ? 'badge-success' : 'badge-error'}">${isTailOk ? `${directCount} Direct / ${peerCount} Peers` : 'Inactive'}</span>
+          </div>
+          <div class="home-c-row">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="status-dot status-green"></span>
+              <strong>Open Listening Sockets</strong>
+            </div>
+            <span class="badge badge-info">${portCount} Ports Audited</span>
+          </div>
+        </div>
+      `;
+    }
+  } catch (err) {
+    console.warn('Home net fetch error', err);
+  }
+
+  // 7. Fetch Journal & Kernel Preview
+  try {
+    const kernelData = await fetchKernelHealth();
+    const journalPill = container.querySelector('#homeJournalPill') as HTMLElement;
+    const journalPreview = container.querySelector('#homeJournalPreview') as HTMLElement;
+
+    if (journalPreview) {
+      const oomCount = kernelData.oom_kill_count || 0;
+      const memPsi = kernelData.memory_pressure?.some?.avg10 || 0;
+      const cpuPsi = kernelData.cpu_pressure?.some?.avg10 || 0;
+
+      if (journalPill) {
+        journalPill.textContent = oomCount > 0 ? `⚠️ ${oomCount} OOM` : 'Healthy';
+        journalPill.className = oomCount > 0 ? 'pill pill-error' : 'pill pill-live';
+      }
+
+      journalPreview.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="home-c-row">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="status-dot ${oomCount === 0 ? 'status-green' : 'status-red'}"></span>
+              <strong>Kernel OOM Killer</strong>
+            </div>
+            <span class="badge ${oomCount === 0 ? 'badge-success' : 'badge-error'}">${oomCount} Kills</span>
+          </div>
+          <div class="home-c-row">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="status-dot status-green"></span>
+              <strong>Memory PSI Stall</strong>
+            </div>
+            <span class="badge badge-info">${memPsi.toFixed(2)}% avg10</span>
+          </div>
+          <div class="home-c-row">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="status-dot status-green"></span>
+              <strong>CPU PSI Stall</strong>
+            </div>
+            <span class="badge badge-info">${cpuPsi.toFixed(2)}% avg10</span>
+          </div>
+        </div>
+      `;
+    }
+  } catch (err) {
+    console.warn('Home journal fetch error', err);
+  }
+
+  // 8. Fetch Maintenance Preview
+  try {
+    const maintData = await fetchMaintenanceDf();
+    const maintPill = container.querySelector('#homeMaintPill') as HTMLElement;
+    const maintPreview = container.querySelector('#homeMaintPreview') as HTMLElement;
+
+    if (maintPreview) {
+      const disk = maintData.disk_root;
+      if (maintPill) {
+        maintPill.textContent = `${formatBytes(disk.free_bytes)} Free`;
+      }
+
+      maintPreview.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="home-c-row">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="status-dot status-green"></span>
+              <strong>Host Root Partition</strong>
+            </div>
+            <span class="badge badge-info">${disk.used_percent}% used (${formatBytes(disk.free_bytes)} free)</span>
+          </div>
+          <div class="home-c-row">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="status-dot status-green"></span>
+              <strong>Docker Storage</strong>
+            </div>
+            <span class="badge badge-success">${maintData.docker.length} tracked types</span>
+          </div>
+        </div>
+      `;
+    }
+  } catch (err) {
+    console.warn('Home maint fetch error', err);
   }
 }

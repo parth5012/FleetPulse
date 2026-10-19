@@ -17,6 +17,17 @@ const routes: Record<string, () => Promise<RenderFn>> = {
   '/system': async () => (await import('./pages/system')).renderSystem,
   '/containers': async () => (await import('./pages/containers')).renderContainers,
   '/antigravity': async () => (await import('./pages/antigravity')).renderAntigravity,
+  '/network': async () => {
+    const mod = await import('./pages/network');
+    activeCleanup = mod.cleanupNetwork;
+    return mod.renderNetwork;
+  },
+  '/journal': async () => {
+    const mod = await import('./pages/journal');
+    activeCleanup = mod.cleanupJournal;
+    return mod.renderJournal;
+  },
+  '/maintenance': async () => (await import('./pages/maintenance')).renderMaintenance,
 };
 
 function currentPath(): string {
