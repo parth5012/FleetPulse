@@ -41,15 +41,22 @@ export interface AntigravitySnapshot {
   error?: string | null;
 }
 
+function getApiBase(): string {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/dashboard')) {
+    return '/dashboard';
+  }
+  return '';
+}
+
 export async function fetchLimits(refresh = false): Promise<AntigravitySnapshot> {
-  const url = `/api/antigravity/limits?format=json${refresh ? '&refresh=true' : ''}`;
+  const url = `${getApiBase()}/api/antigravity/limits?format=json${refresh ? '&refresh=true' : ''}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function syncOmniRoute(): Promise<unknown> {
-  const res = await fetch('/api/antigravity/sync', { method: 'POST' });
+  const res = await fetch(`${getApiBase()}/api/antigravity/sync`, { method: 'POST' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -134,13 +141,13 @@ export interface SystemHistoryPoint {
 }
 
 export async function fetchSystemMetrics(): Promise<SystemSnapshot> {
-  const res = await fetch('/api/system/metrics');
+  const res = await fetch(`${getApiBase()}/api/system/metrics`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function fetchSystemHistory(): Promise<{ history: SystemHistoryPoint[] }> {
-  const res = await fetch('/api/system/history');
+  const res = await fetch(`${getApiBase()}/api/system/history`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -178,7 +185,7 @@ export interface LogResponse {
 }
 
 export async function fetchContainers(): Promise<{ containers: ContainerSummary[] }> {
-  const res = await fetch('/api/containers');
+  const res = await fetch(`${getApiBase()}/api/containers`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -194,7 +201,7 @@ export async function fetchContainerLogs(
     timestamps: String(timestamps),
   });
   if (search) params.set('search', search);
-  const res = await fetch(`/api/containers/${encodeURIComponent(idOrName)}/logs?${params}`);
+  const res = await fetch(`${getApiBase()}/api/containers/${encodeURIComponent(idOrName)}/logs?${params}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -203,7 +210,7 @@ export async function triggerContainerAction(
   idOrName: string,
   action: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-  const res = await fetch(`/api/containers/${encodeURIComponent(idOrName)}/action`, {
+  const res = await fetch(`${getApiBase()}/api/containers/${encodeURIComponent(idOrName)}/action`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action }),

@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from antigravity import router as antigravity_router
@@ -17,9 +17,19 @@ app.include_router(antigravity_router)
 app.include_router(system_router)
 app.include_router(containers_router)
 
+# Also mount under /dashboard prefix for reverse proxy / path prefix setups
+app.include_router(antigravity_router, prefix="/dashboard")
+app.include_router(system_router, prefix="/dashboard")
+app.include_router(containers_router, prefix="/dashboard")
+
 # Serve Vite build (SPA) if present
 if DIST_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(DIST_DIR / "assets")), name="assets")
+    app.mount("/dashboard/assets", StaticFiles(directory=str(DIST_DIR / "assets")), name="dashboard-assets")
+
+    @app.get("/dashboard", response_class=RedirectResponse)
+    async def dashboard_redirect():
+        return RedirectResponse(url="/dashboard/", status_code=307)
 
     @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], response_class=HTMLResponse)
     async def spa_fallback(full_path: str):
