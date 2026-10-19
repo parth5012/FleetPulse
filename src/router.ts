@@ -2,6 +2,8 @@ type RenderFn = (container: HTMLElement) => void | Promise<void>;
 
 const routes: Record<string, () => Promise<RenderFn>> = {
   '/': async () => (await import('./pages/home')).renderHome,
+  '/system': async () => (await import('./pages/system')).renderSystem,
+  '/containers': async () => (await import('./pages/containers')).renderContainers,
   '/antigravity': async () => (await import('./pages/antigravity')).renderAntigravity,
 };
 

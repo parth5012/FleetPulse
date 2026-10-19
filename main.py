@@ -6,12 +6,16 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from antigravity import router as antigravity_router
+from containers import router as containers_router
+from system_metrics import router as system_router
 
 BASE_DIR = Path(__file__).resolve().parent
 DIST_DIR = BASE_DIR / "dist"
 
 app = FastAPI(title="Dashboard Service", version="0.1.0")
 app.include_router(antigravity_router)
+app.include_router(system_router)
+app.include_router(containers_router)
 
 # Serve Vite build (SPA) if present
 if DIST_DIR.exists():
