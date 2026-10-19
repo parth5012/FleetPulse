@@ -21,7 +21,7 @@ app.include_router(containers_router)
 if DIST_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(DIST_DIR / "assets")), name="assets")
 
-    @app.get("/{full_path:path}", response_class=HTMLResponse)
+    @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], response_class=HTMLResponse)
     async def spa_fallback(full_path: str):
         index = DIST_DIR / "index.html"
         if index.exists():
