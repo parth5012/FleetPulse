@@ -7,15 +7,18 @@ Maintains a rolling historical ring buffer for time-series charts and sparklines
 import collections
 import os
 import platform
+import sys
 import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import psutil
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+
+from metrics_db import MetricsDatabase
 
 # ---------------------------------------------------------------------------
 # Pydantic Models
@@ -100,13 +103,44 @@ class SystemHistoryPoint(BaseModel):
 # Metrics Collector Service
 # ---------------------------------------------------------------------------
 class SystemMetricsService:
-    def __init__(self, history_size: int = 60):
+    def __init__(
+        self,
+        history_size: int = 60,
+        db: Optional[MetricsDatabase] = None,
+        enable_sampler: bool = True,
+        sampler_interval_sec: float = 5.0,
+    ):
         self.history_size = history_size
         self._lock = threading.Lock()
         self._history: collections.deque = collections.deque(maxlen=history_size)
         self._last_disk_io: Optional[Any] = None
         self._last_net_io: Optional[Any] = None
         self._last_io_time: float = 0.0
+
+        if db is not None:
+            self.db = db
+        elif os.getenv("TESTING") == "1" or "pytest" in sys.modules:
+            self.db = MetricsDatabase(":memory:")
+        else:
+            self.db = MetricsDatabase()
+
+        # Seed in-memory rolling history from SQLite database on startup
+        try:
+            persisted = self.db.get_recent_history(limit=history_size)
+            for p in persisted:
+                self._history.append(
+                    {
+                        "timestamp": p["timestamp"],
+                        "cpu": p["cpu"],
+                        "memory": p["memory"],
+                        "disk_read_kb": p.get("disk_read_kb", 0.0),
+                        "disk_write_kb": p.get("disk_write_kb", 0.0),
+                        "net_rx_kb": p.get("net_rx_kb", 0.0),
+                        "net_tx_kb": p.get("net_tx_kb", 0.0),
+                    }
+                )
+        except Exception:
+            pass
 
         # Prime psutil cpu counters
         try:
@@ -117,6 +151,37 @@ class SystemMetricsService:
             self._last_io_time = time.time()
         except Exception:
             pass
+
+        # Periodic background sampler for persistent database logging
+        self._stop_sampler = False
+        self._sampler_thread: Optional[threading.Thread] = None
+        if enable_sampler and os.getenv("TESTING") != "1" and "pytest" not in sys.modules:
+            self._start_background_sampler(interval_sec=sampler_interval_sec)
+
+    def _start_background_sampler(self, interval_sec: float = 5.0) -> None:
+        def _worker():
+            last_prune_time = 0.0
+            while not self._stop_sampler:
+                try:
+                    self.collect_snapshot()
+                    # Prune metrics older than 7 days once per hour
+                    now = time.time()
+                    if now - last_prune_time > 3600.0:
+                        self.db.prune_older_than(days=7)
+                        last_prune_time = now
+                except Exception:
+                    pass
+                time.sleep(interval_sec)
+
+        self._sampler_thread = threading.Thread(
+            target=_worker, daemon=True, name="SystemMetricsSampler"
+        )
+        self._sampler_thread.start()
+
+    def stop_sampler(self) -> None:
+        self._stop_sampler = True
+        if self._sampler_thread and self._sampler_thread.is_alive():
+            self._sampler_thread.join(timeout=1.0)
 
     def _get_load_avg(self) -> List[float]:
         try:
@@ -285,16 +350,43 @@ class SystemMetricsService:
             load_avg=load_avg,
         )
 
+        disk_read_kb = round(disk_metrics.read_bytes_per_sec / 1024, 1)
+        disk_write_kb = round(disk_metrics.write_bytes_per_sec / 1024, 1)
+        net_rx_kb = round(net_metrics.bytes_recv_per_sec / 1024, 1)
+        net_tx_kb = round(net_metrics.bytes_sent_per_sec / 1024, 1)
+
+        # Persist metrics to SQLite for long-term averages & historical trends
+        try:
+            self.db.insert_metric(
+                timestamp=now_iso,
+                timestamp_epoch=now_ts,
+                cpu_percent=cpu_metrics.total_percent,
+                memory_used_percent=mem_metrics.used_percent,
+                memory_used_bytes=mem_metrics.used_bytes,
+                memory_total_bytes=mem_metrics.total_bytes,
+                swap_used_percent=mem_metrics.swap_used_percent,
+                load_1m=load_avg[0] if len(load_avg) > 0 else 0.0,
+                load_5m=load_avg[1] if len(load_avg) > 1 else 0.0,
+                load_15m=load_avg[2] if len(load_avg) > 2 else 0.0,
+                disk_used_percent=disk_metrics.used_percent,
+                disk_read_kb=disk_read_kb,
+                disk_write_kb=disk_write_kb,
+                net_rx_kb=net_rx_kb,
+                net_tx_kb=net_tx_kb,
+            )
+        except Exception:
+            pass
+
         with self._lock:
             self._history.append(
                 SystemHistoryPoint(
                     timestamp=now_iso,
                     cpu=cpu_metrics.total_percent,
                     memory=mem_metrics.used_percent,
-                    disk_read_kb=round(disk_metrics.read_bytes_per_sec / 1024, 1),
-                    disk_write_kb=round(disk_metrics.write_bytes_per_sec / 1024, 1),
-                    net_rx_kb=round(net_metrics.bytes_recv_per_sec / 1024, 1),
-                    net_tx_kb=round(net_metrics.bytes_sent_per_sec / 1024, 1),
+                    disk_read_kb=disk_read_kb,
+                    disk_write_kb=disk_write_kb,
+                    net_rx_kb=net_rx_kb,
+                    net_tx_kb=net_tx_kb,
                 ).model_dump()
             )
 
@@ -305,7 +397,16 @@ class SystemMetricsService:
 
     def get_history(self) -> List[Dict[str, Any]]:
         with self._lock:
-            return list(self._history)
+            if len(self._history) > 0:
+                return list(self._history)
+        try:
+            return self.db.get_recent_history(limit=self.history_size)
+        except Exception:
+            return []
+
+    def get_aggregates(self, hours: float = 24.0) -> Dict[str, Any]:
+        """Compute aggregated statistics (average RAM, peak RAM, average load) from SQLite."""
+        return self.db.get_aggregates(hours=hours)
 
 
 # Global Service Instance
@@ -327,6 +428,13 @@ async def get_system_metrics():
     """Retrieve instant snapshot of CPU, Memory, Disk, Network, and Host status."""
     service = get_system_service()
     return service.get_current_snapshot()
+
+
+@router.get("/stats")
+async def get_system_stats(hours: float = Query(24.0, ge=0.1, le=720.0)):
+    """Retrieve rolling average RAM usage, average system load, and peak statistics from SQLite."""
+    service = get_system_service()
+    return service.get_aggregates(hours=hours)
 
 
 @router.get("/history")

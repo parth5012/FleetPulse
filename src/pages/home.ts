@@ -6,6 +6,7 @@
 
 import {
   fetchSystemMetrics,
+  fetchSystemStats,
   fetchContainers,
   fetchLimits,
   fetchTasks,
@@ -87,7 +88,9 @@ export async function renderHome(container: HTMLElement): Promise<void> {
           <div class="service-meta-list" id="homeSysMeta">
             <div><span>Host:</span> <strong id="hMetaHost">-</strong></div>
             <div><span>Uptime:</span> <strong id="hMetaUptime">-</strong></div>
-            <div><span>Load:</span> <strong id="hMetaLoad">-</strong></div>
+            <div><span>Live Load:</span> <strong id="hMetaLoad">-</strong></div>
+            <div><span>Avg RAM (24h):</span> <strong id="hMetaAvgMem" style="color:#a855f7;">-</strong></div>
+            <div><span>Avg Load (24h):</span> <strong id="hMetaAvgLoad" style="color:#10b981;">-</strong></div>
           </div>
         </div>
         <div class="service-foot">
@@ -239,6 +242,21 @@ export async function renderHome(container: HTMLElement): Promise<void> {
     if (upEl) upEl.textContent = formatUptime(sys.host.uptime_seconds);
     const loadEl = container.querySelector('#hMetaLoad') as HTMLElement;
     if (loadEl) loadEl.textContent = (sys.load_avg || []).join(' · ') || '0.0';
+
+    // Fetch rolling 24h SQLite stats for Avg RAM and Avg Load
+    try {
+      const stats = await fetchSystemStats(24);
+      const avgMemEl = container.querySelector('#hMetaAvgMem') as HTMLElement;
+      if (avgMemEl) {
+        avgMemEl.textContent = `${stats.memory.avg_percent.toFixed(1)}%`;
+      }
+      const avgLoadEl = container.querySelector('#hMetaAvgLoad') as HTMLElement;
+      if (avgLoadEl) {
+        avgLoadEl.textContent = `${stats.load.avg_1m.toFixed(2)} (1m)`;
+      }
+    } catch {
+      // optional
+    }
   } catch (err) {
     console.warn('Home sys fetch error', err);
   }

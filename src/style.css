@@ -1601,6 +1601,89 @@ button, input, select {
   font-weight: 700;
 }
 
+/* ---------------------------------------------------------------------------
+   SQLite Persistent Telemetry Section
+--------------------------------------------------------------------------- */
+.sqlite-stats-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sqlite-stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sqlite-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.timeframe-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timeframe-buttons .btn {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+
+.sqlite-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.sqlite-metric-tile {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sqlite-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.sqlite-tile-val {
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--text);
+  margin-top: 2px;
+}
+
+.sqlite-tile-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
 .metrics-quad-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

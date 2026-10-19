@@ -6,3 +6,5 @@ __pycache__/
 tsconfig.tsbuildinfo
 .tmp/
 .env
+data/
+*.db

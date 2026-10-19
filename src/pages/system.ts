@@ -4,10 +4,10 @@
  * Disk usage & I/O, Network throughput, and rolling time-series area charts.
  */
 
-import { fetchSystemMetrics, fetchSystemHistory, fetchContainers } from '../lib/api';
+import { fetchSystemMetrics, fetchSystemHistory, fetchContainers, fetchSystemStats } from '../lib/api';
 import { formatBytes, formatUptime, esc } from '../lib/format';
 import { renderDonutGauge, renderSparkline, renderAreaChart, renderBarGauge } from '../lib/charts';
-import type { SystemSnapshot, SystemHistoryPoint, ContainerSummary } from '../lib/api';
+import type { SystemSnapshot, SystemHistoryPoint, ContainerSummary, SystemStatsResponse } from '../lib/api';
 
 export async function renderSystem(container: HTMLElement): Promise<void> {
   container.innerHTML = `
@@ -37,6 +37,81 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
       <div class="host-pill"><span class="icon">📦</span> Processes: <span id="hostProcs">-</span></div>
     </div>
 
+    <!-- Persistent SQLite Telemetry & Rolling Aggregates Section -->
+    <div class="sqlite-stats-card" id="sqliteStatsCard">
+      <div class="sqlite-stats-header">
+        <div>
+          <div class="sqlite-title">
+            <span>🗄️ SQLite Persistent Telemetry & Averages</span>
+            <span class="badge badge-info" id="sqliteSampleBadge">Active Engine</span>
+          </div>
+          <div class="muted" style="font-size:0.8rem;margin-top:2px;">
+            Long-term metrics persistence: rolling historical averages, peak loads, and RAM consumption
+          </div>
+        </div>
+        <div class="timeframe-buttons" id="timeframeButtons">
+          <button class="btn btn-sm" data-hours="1">1h</button>
+          <button class="btn btn-sm" data-hours="6">6h</button>
+          <button class="btn btn-sm btn-primary" data-hours="24">24h</button>
+          <button class="btn btn-sm" data-hours="168">7d</button>
+        </div>
+      </div>
+
+      <div class="sqlite-metrics-row">
+        <!-- Avg RAM -->
+        <div class="sqlite-metric-tile">
+          <div class="sqlite-tile-head">
+            <span class="indicator-dot dot-mem"></span>
+            <span>Average RAM Usage</span>
+          </div>
+          <div class="sqlite-tile-val" id="statAvgRam">0.0%</div>
+          <div class="sqlite-tile-sub" id="statRamRange">Min: 0% · Peak: 0%</div>
+          <div class="bar-outer" style="height:4px;margin-top:6px;">
+            <div class="bar-inner" id="statRamBar" style="width:0%;background:#a855f7;"></div>
+          </div>
+        </div>
+
+        <!-- Avg Load -->
+        <div class="sqlite-metric-tile">
+          <div class="sqlite-tile-head">
+            <span class="indicator-dot dot-cpu"></span>
+            <span>Average System Load</span>
+          </div>
+          <div class="sqlite-tile-val" id="statAvgLoad">0.00</div>
+          <div class="sqlite-tile-sub" id="statLoadRange">5m: 0.00 · 15m: 0.00 · Peak 1m: 0.00</div>
+          <div class="bar-outer" style="height:4px;margin-top:6px;">
+            <div class="bar-inner" id="statLoadBar" style="width:0%;background:#10b981;"></div>
+          </div>
+        </div>
+
+        <!-- Avg CPU -->
+        <div class="sqlite-metric-tile">
+          <div class="sqlite-tile-head">
+            <span class="indicator-dot dot-cpu"></span>
+            <span>Average CPU Utilization</span>
+          </div>
+          <div class="sqlite-tile-val" id="statAvgCpu">0.0%</div>
+          <div class="sqlite-tile-sub" id="statCpuPeak">Peak: 0.0%</div>
+          <div class="bar-outer" style="height:4px;margin-top:6px;">
+            <div class="bar-inner" id="statCpuBar" style="width:0%;background:#10b981;"></div>
+          </div>
+        </div>
+
+        <!-- Database Storage & Sampling -->
+        <div class="sqlite-metric-tile">
+          <div class="sqlite-tile-head">
+            <span class="indicator-dot dot-disk"></span>
+            <span>Persistence Metrics</span>
+          </div>
+          <div class="sqlite-tile-val" id="statSampleCount">0</div>
+          <div class="sqlite-tile-sub" id="statRetention">Stored in SQLite WAL · 7-day retention</div>
+          <div class="bar-outer" style="height:4px;margin-top:6px;">
+            <div class="bar-inner" style="width:100%;background:#06b6d4;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 4 Primary Metric Cards with Radial Donut Gauges & Sparklines -->
     <div class="metrics-quad-grid">
       <!-- CPU Card -->
@@ -51,6 +126,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
           <div id="cpuDonut"></div>
           <div class="card-vitals">
             <div class="vital-row"><span>Load Average</span><strong id="cpuLoad">-</strong></div>
+            <div class="vital-row"><span>Rolling Avg Load</span><strong id="cpuAvgLoad">-</strong></div>
             <div class="vital-row"><span>Logical Cores</span><strong id="cpuLogical">-</strong></div>
             <div class="vital-row"><span>Physical Cores</span><strong id="cpuPhysical">-</strong></div>
             <div class="spark-box" id="cpuSpark"></div>
@@ -75,6 +151,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
           <div id="memDonut"></div>
           <div class="card-vitals">
             <div class="vital-row"><span>Used RAM</span><strong id="memUsed">-</strong></div>
+            <div class="vital-row"><span>Rolling Avg RAM</span><strong id="memAvg">-</strong></div>
             <div class="vital-row"><span>Available</span><strong id="memAvail">-</strong></div>
             <div class="vital-row"><span>Swap Used</span><strong id="memSwap">-</strong></div>
             <div class="spark-box" id="memSpark"></div>
@@ -400,6 +477,85 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
   }
 
   // Event handlers
+  let currentStatsHours = 24;
+
+  async function loadSystemStats(hours: number): Promise<void> {
+    try {
+      const stats = await fetchSystemStats(hours);
+      const avgRamEl = container.querySelector('#statAvgRam');
+      const ramRangeEl = container.querySelector('#statRamRange');
+      const ramBarEl = container.querySelector('#statRamBar') as HTMLElement;
+      const avgLoadEl = container.querySelector('#statAvgLoad');
+      const loadRangeEl = container.querySelector('#statLoadRange');
+      const loadBarEl = container.querySelector('#statLoadBar') as HTMLElement;
+      const avgCpuEl = container.querySelector('#statAvgCpu');
+      const cpuPeakEl = container.querySelector('#statCpuPeak');
+      const cpuBarEl = container.querySelector('#statCpuBar') as HTMLElement;
+      const sampleEl = container.querySelector('#statSampleCount');
+      const badgeEl = container.querySelector('#sqliteSampleBadge');
+      const cpuAvgLoadEl = container.querySelector('#cpuAvgLoad');
+      const memAvgEl = container.querySelector('#memAvg');
+
+      if (avgRamEl) {
+        avgRamEl.textContent = `${stats.memory.avg_percent.toFixed(1)}%`;
+      }
+      if (ramRangeEl) {
+        ramRangeEl.textContent = `Min: ${stats.memory.min_percent ?? 0}% · Peak: ${stats.memory.max_percent ?? 0}% (${formatBytes(stats.memory.avg_bytes ?? 0)})`;
+      }
+      if (ramBarEl) {
+        ramBarEl.style.width = `${Math.min(100, stats.memory.avg_percent)}%`;
+      }
+
+      if (avgLoadEl) {
+        avgLoadEl.textContent = stats.load.avg_1m.toFixed(2);
+      }
+      if (loadRangeEl) {
+        loadRangeEl.textContent = `5m: ${stats.load.avg_5m.toFixed(2)} · 15m: ${stats.load.avg_15m.toFixed(2)} · Peak 1m: ${stats.load.max_1m.toFixed(2)}`;
+      }
+      if (loadBarEl) {
+        loadBarEl.style.width = `${Math.min(100, (stats.load.avg_1m / 4) * 100)}%`;
+      }
+
+      if (avgCpuEl) {
+        avgCpuEl.textContent = `${stats.cpu.avg_percent.toFixed(1)}%`;
+      }
+      if (cpuPeakEl) {
+        cpuPeakEl.textContent = `Peak: ${(stats.cpu.max_percent ?? 0).toFixed(1)}%`;
+      }
+      if (cpuBarEl) {
+        cpuBarEl.style.width = `${Math.min(100, stats.cpu.avg_percent)}%`;
+      }
+
+      if (sampleEl) {
+        sampleEl.textContent = `${stats.sample_count} points`;
+      }
+      if (badgeEl) {
+        badgeEl.textContent = `${stats.sample_count} Snapshots (${stats.timeframe_hours}h)`;
+      }
+
+      if (cpuAvgLoadEl) {
+        cpuAvgLoadEl.textContent = `${stats.load.avg_1m.toFixed(2)} (${stats.timeframe_hours}h avg)`;
+      }
+      if (memAvgEl) {
+        memAvgEl.textContent = `${stats.memory.avg_percent.toFixed(1)}% (${stats.timeframe_hours}h avg)`;
+      }
+    } catch (err) {
+      console.warn('Failed to load system stats from SQLite', err);
+    }
+  }
+
+  // Timeframe buttons
+  const tfBtns = container.querySelectorAll('#timeframeButtons button') as NodeListOf<HTMLButtonElement>;
+  tfBtns.forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      tfBtns.forEach((b) => b.classList.remove('btn-primary'));
+      btn.classList.add('btn-primary');
+      const h = parseFloat(btn.getAttribute('data-hours') || '24');
+      currentStatsHours = h;
+      await loadSystemStats(h);
+    });
+  });
+
   pauseBtn.addEventListener('click', () => {
     isPaused = !isPaused;
     if (isPaused) {
@@ -422,12 +578,14 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     refreshIcon.classList.add('spin');
     await pollMetrics();
     await loadContainersPulse();
+    await loadSystemStats(currentStatsHours);
     setTimeout(() => refreshIcon.classList.remove('spin'), 400);
   });
 
   // Start initialization
   await loadInitialHistory();
   await pollMetrics();
+  await loadSystemStats(currentStatsHours);
   await loadContainersPulse();
 
   // Periodic polling every 2.0s
@@ -437,8 +595,13 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     }
   }, 2000);
 
-  // Poll containers pulse every 10s
+  // Poll containers pulse every 10s & stats every 10s
   const cTimer = window.setInterval(loadContainersPulse, 10000);
+  const sTimer = window.setInterval(() => {
+    if (!isPaused) {
+      loadSystemStats(currentStatsHours);
+    }
+  }, 10000);
 
   // Cleanup on route departure
   window.addEventListener(
@@ -446,6 +609,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     () => {
       if (timerId) clearInterval(timerId);
       clearInterval(cTimer);
+      clearInterval(sTimer);
     },
     { once: true }
   );

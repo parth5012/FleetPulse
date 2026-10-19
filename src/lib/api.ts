@@ -140,6 +140,30 @@ export interface SystemHistoryPoint {
   net_tx_kb: number;
 }
 
+export interface MetricStatRange {
+  avg_percent: number;
+  min_percent?: number;
+  max_percent?: number;
+  avg_bytes?: number;
+}
+
+export interface LoadStatRange {
+  avg_1m: number;
+  max_1m: number;
+  avg_5m: number;
+  avg_15m: number;
+}
+
+export interface SystemStatsResponse {
+  timeframe_hours: number;
+  sample_count: number;
+  start_time: string | null;
+  end_time: string | null;
+  memory: MetricStatRange;
+  cpu: MetricStatRange;
+  load: LoadStatRange;
+}
+
 export async function fetchSystemMetrics(): Promise<SystemSnapshot> {
   const res = await fetch(`${getApiBase()}/api/system/metrics`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -148,6 +172,12 @@ export async function fetchSystemMetrics(): Promise<SystemSnapshot> {
 
 export async function fetchSystemHistory(): Promise<{ history: SystemHistoryPoint[] }> {
   const res = await fetch(`${getApiBase()}/api/system/history`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchSystemStats(hours = 24): Promise<SystemStatsResponse> {
+  const res = await fetch(`${getApiBase()}/api/system/stats?hours=${hours}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
