@@ -1,7 +1,8 @@
 {
-  "name": "dashboard-service",
+  "name": "fleetpulse",
   "version": "0.1.0",
-  "private": true,
+  "description": "FleetPulse — All-in-one host observability, btop-style process management, Beszel hardware telemetry, Tailscale mesh inspection, and AI quota monitor",
+  "private": false,
   "type": "module",
   "scripts": {
     "dev": "vite",

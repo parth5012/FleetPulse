@@ -1,7 +1,7 @@
 {
-  "name": "Dashboard Hub - Fleet & System Observability",
-  "short_name": "Dashboard",
-  "description": "Real-time task manager, system services, Beszel server telemetry, and Dozzel container log console",
+  "name": "FleetPulse — Host Observability & Telemetry",
+  "short_name": "FleetPulse",
+  "description": "All-in-one host observability, btop-style process management, Beszel hardware telemetry, Tailscale mesh, and AI quota monitor",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -7,8 +7,8 @@ export function renderShell(root: HTMLElement): void {
           <a href="#/" class="brand-link">
             <span class="brand-logo">⚡</span>
             <div class="brand-text">
-              <span class="brand-title">Dashboard Hub</span>
-              <span class="brand-sub">Fleet Observability & Task Engine</span>
+              <span class="brand-title">FleetPulse</span>
+              <span class="brand-sub">Host Observability & Task Engine</span>
             </div>
           </a>
         </div>
