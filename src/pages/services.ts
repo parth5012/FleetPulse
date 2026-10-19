@@ -6,6 +6,7 @@
 
 import { fetchServices, triggerServiceAction, ServiceItem, ServicesOverview } from '../lib/api';
 import { esc } from '../lib/format';
+import { renderDonutGauge, renderStackedBar, StackedSegment } from '../lib/charts';
 
 interface ServicesState {
   scope: 'all' | 'user' | 'system';
@@ -70,10 +71,13 @@ export async function renderServices(container: HTMLElement): Promise<void> {
           <div class="vital-value" id="svcTotal">--</div>
           <div class="vital-sub" id="svcTotalSub">User: -- | System: --</div>
         </div>
-        <div class="vital-card">
-          <div class="vital-label">RUNNING</div>
-          <div class="vital-value text-success" id="svcRunning">--</div>
-          <div class="vital-sub">Active daemon processes</div>
+        <div class="vital-card" style="display:flex; align-items:center; gap:14px;">
+          <div id="svcActiveDonut" style="flex-shrink:0;"></div>
+          <div style="flex:1; min-width:0;">
+            <div class="vital-label">ACTIVE RATIO</div>
+            <div class="vital-value text-success" id="svcRunning">--</div>
+            <div class="vital-sub">Active daemon processes</div>
+          </div>
         </div>
         <div class="vital-card">
           <div class="vital-label">FAILED</div>
@@ -85,6 +89,11 @@ export async function renderServices(container: HTMLElement): Promise<void> {
           <div class="vital-value text-primary" id="svcMemory">--</div>
           <div class="vital-sub">Tracked cgroup RAM footprint</div>
         </div>
+      </div>
+
+      <!-- Top Daemon Memory Consumption Stacked Bar -->
+      <div class="card" id="svcDistributionCard" style="margin-bottom: 20px; padding: 16px 20px; display: none;">
+        <div id="svcMemDistBar"></div>
       </div>
 
       <!-- Filter & Scope Toolbar -->
@@ -215,6 +224,7 @@ function renderVitals(container: HTMLElement): void {
   const totalEl = container.querySelector('#svcTotal');
   const totalSubEl = container.querySelector('#svcTotalSub');
   const runEl = container.querySelector('#svcRunning');
+  const activeDonutEl = container.querySelector('#svcActiveDonut') as HTMLElement;
   const failEl = container.querySelector('#svcFailed');
   const failSubEl = container.querySelector('#svcFailedSub');
   const memEl = container.querySelector('#svcMemory');
@@ -222,6 +232,15 @@ function renderVitals(container: HTMLElement): void {
   if (totalEl) totalEl.textContent = String(ov.total_services);
   if (totalSubEl) totalSubEl.textContent = `User: ${ov.user_services} | System: ${ov.system_services}`;
   if (runEl) runEl.textContent = String(ov.running_services);
+
+  if (activeDonutEl && ov.total_services > 0) {
+    const activePct = Math.round((ov.running_services / ov.total_services) * 100);
+    activeDonutEl.innerHTML = renderDonutGauge(activePct, {
+      size: 58,
+      strokeWidth: 6,
+      color: '#10b981',
+    });
+  }
 
   if (failEl) {
     failEl.textContent = String(ov.failed_services);
@@ -231,6 +250,33 @@ function renderVitals(container: HTMLElement): void {
     failSubEl.textContent = ov.failed_services > 0 ? '⚠️ Action needed' : 'All monitored units healthy';
   }
   if (memEl) memEl.textContent = ov.total_memory_formatted;
+
+  // Render Top Service Memory Allocation Stacked Bar
+  const distCard = container.querySelector('#svcDistributionCard') as HTMLElement;
+  const memDistEl = container.querySelector('#svcMemDistBar') as HTMLElement;
+
+  if (distCard && memDistEl && state.services.length > 0) {
+    const colors = ['#818cf8', '#38bdf8', '#34d399', '#f59e0b', '#ec4899'];
+    const topMemSvcs = [...state.services]
+      .sort((a, b) => b.memory_bytes - a.memory_bytes)
+      .slice(0, 5)
+      .filter((s) => s.memory_bytes > 512 * 1024);
+
+    if (topMemSvcs.length > 0) {
+      distCard.style.display = 'block';
+      const segments: StackedSegment[] = topMemSvcs.map((s, i) => ({
+        label: s.name.length > 16 ? s.name.slice(0, 14) + '..' : s.name,
+        value: s.memory_bytes,
+        color: colors[i % colors.length],
+        displayValue: s.memory_formatted,
+      }));
+      memDistEl.innerHTML = renderStackedBar(segments, {
+        height: 10,
+        title: 'Top Service Memory Consumers (cgroup footprint)',
+        showLegend: true,
+      });
+    }
+  }
 }
 
 function renderServicesList(view: Element): void {

@@ -146,18 +146,41 @@ export async function renderHome(container: HTMLElement): Promise<void> {
     }
     const preview = container.querySelector('#homeTasksPreview') as HTMLElement;
     if (preview) {
-      preview.innerHTML = taskRes.tasks.map((t) => `
-        <div class="home-c-row">
-          <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
-            <code style="font-size:0.75rem;color:var(--text-muted);">${t.pid}</code>
-            <strong style="font-size:0.85rem;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${esc(t.name)}</strong>
-          </div>
-          <div style="display:flex;gap:6px;flex-shrink:0;">
-            <span class="c-pill" style="color:var(--primary)">${t.cpu_percent.toFixed(1)}%</span>
-            <span class="c-pill">${esc(t.memory_formatted)}</span>
-          </div>
+      const cpuDonut = renderDonutGauge(taskRes.overview.cpu_total_percent, {
+        size: 58,
+        strokeWidth: 5,
+        label: 'CPU',
+        color: taskRes.overview.cpu_total_percent > 75 ? '#ef4444' : '#38bdf8',
+      });
+      const ramDonut = renderDonutGauge(taskRes.overview.memory_used_percent, {
+        size: 58,
+        strokeWidth: 5,
+        label: 'RAM',
+        color: '#818cf8',
+      });
+
+      preview.innerHTML = `
+        <div style="display:flex; justify-content:space-around; align-items:center; margin-bottom:12px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+          ${cpuDonut}
+          ${ramDonut}
         </div>
-      `).join('');
+        ${taskRes.tasks
+          .map(
+            (t) => `
+          <div class="home-c-row">
+            <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
+              <code style="font-size:0.75rem;color:var(--text-muted);">${t.pid}</code>
+              <strong style="font-size:0.85rem;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${esc(t.name)}</strong>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+              <span class="c-pill" style="color:var(--primary)">${t.cpu_percent.toFixed(1)}%</span>
+              <span class="c-pill">${esc(t.memory_formatted)}</span>
+            </div>
+          </div>
+        `
+          )
+          .join('')}
+      `;
     }
   } catch (err) {
     console.warn('Home tasks fetch error', err);
@@ -268,20 +291,57 @@ export async function renderHome(container: HTMLElement): Promise<void> {
       if (accs.length === 0) {
         agyPreview.innerHTML = '<div class="empty-state" style="padding:16px 8px;"><p>No Antigravity accounts configured</p></div>';
       } else {
-        agyPreview.innerHTML = accs
-          .slice(0, 3)
-          .map(
-            (a) => `
-          <div class="home-c-row">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="status-dot status-green"></span>
-              <strong style="font-size:0.85rem;">${esc(a.account_id)}</strong>
+        let totalFrac = 0;
+        let count = 0;
+        accs.forEach((a) => {
+          (a.groups || []).forEach((g) => {
+            (g.buckets || []).forEach((b) => {
+              totalFrac += Number(b.remainingFraction || 0);
+              count++;
+            });
+          });
+          if ((a.groups || []).length === 0) {
+            (a.families || []).forEach((f) => {
+              totalFrac += Number(f.remaining || 0);
+              count++;
+            });
+          }
+        });
+        const headroomPct = count > 0 ? Math.round((totalFrac / count) * 100) : 100;
+
+        const donutHtml = renderDonutGauge(headroomPct, {
+          size: 68,
+          strokeWidth: 6,
+          label: 'HEADROOM',
+          color: headroomPct > 50 ? '#10b981' : headroomPct > 20 ? '#f59e0b' : '#ef4444',
+        });
+
+        agyPreview.innerHTML = `
+          <div style="display:flex; align-items:center; gap:16px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.05);">
+            <div style="flex-shrink:0;">${donutHtml}</div>
+            <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+              <strong style="font-size:0.9rem; color:var(--text);">${accs.length} OmniRoute Accounts</strong>
+              <span style="font-size:0.75rem; color:var(--text-muted);">${count} Active Quota Pools</span>
+              <span class="status-chip status-running" style="align-self:flex-start; margin-top:2px; font-size:0.65rem;">QUOTA READY</span>
             </div>
-            <span class="c-pill">${(a.groups || []).length || (a.families || []).length} Quota pools</span>
           </div>
-        `
-          )
-          .join('');
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            ${accs
+              .slice(0, 2)
+              .map(
+                (a) => `
+              <div class="home-c-row">
+                <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
+                  <span class="status-dot status-green"></span>
+                  <strong style="font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.account_id)}</strong>
+                </div>
+                <span class="c-pill" style="flex-shrink:0;">${(a.groups || []).length || (a.families || []).length} pools</span>
+              </div>
+            `
+              )
+              .join('')}
+          </div>
+        `;
       }
     }
   } catch (err) {

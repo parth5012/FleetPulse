@@ -6,6 +6,7 @@
 
 import { fetchTasks, triggerTaskAction, TaskItem, TasksOverview } from '../lib/api';
 import { esc } from '../lib/format';
+import { renderDonutGauge, renderStackedBar, StackedSegment } from '../lib/charts';
 
 interface TasksState {
   sortBy: string;
@@ -61,20 +62,26 @@ export async function renderTasks(container: HTMLElement): Promise<void> {
         </div>
       </div>
 
-      <!-- Quick Vitals Ribbon -->
+      <!-- Quick Vitals Ribbon with Donut Gauges -->
       <div class="vitals-ribbon" id="tasksVitals">
-        <div class="vital-card">
-          <div class="vital-label">CPU LOAD</div>
-          <div class="vital-value" id="vitalCpu">--%</div>
-          <div class="vital-bar-track">
-            <div class="vital-bar-fill vital-cpu" id="vitalCpuBar" style="width: 0%"></div>
+        <div class="vital-card" style="display:flex; align-items:center; gap:14px;">
+          <div id="vitalCpuDonut" style="flex-shrink:0;"></div>
+          <div style="flex:1; min-width:0;">
+            <div class="vital-label">CPU LOAD</div>
+            <div class="vital-value" id="vitalCpu">--%</div>
+            <div class="vital-bar-track" style="margin-top:6px;">
+              <div class="vital-bar-fill vital-cpu" id="vitalCpuBar" style="width: 0%"></div>
+            </div>
           </div>
         </div>
-        <div class="vital-card">
-          <div class="vital-label">RAM USED</div>
-          <div class="vital-value" id="vitalRam">--%</div>
-          <div class="vital-bar-track">
-            <div class="vital-bar-fill vital-ram" id="vitalRamBar" style="width: 0%"></div>
+        <div class="vital-card" style="display:flex; align-items:center; gap:14px;">
+          <div id="vitalRamDonut" style="flex-shrink:0;"></div>
+          <div style="flex:1; min-width:0;">
+            <div class="vital-label">RAM USED</div>
+            <div class="vital-value" id="vitalRam">--%</div>
+            <div class="vital-bar-track" style="margin-top:6px;">
+              <div class="vital-bar-fill vital-ram" id="vitalRamBar" style="width: 0%"></div>
+            </div>
           </div>
         </div>
         <div class="vital-card">
@@ -86,6 +93,14 @@ export async function renderTasks(container: HTMLElement): Promise<void> {
           <div class="vital-label">THREADS</div>
           <div class="vital-value" id="vitalThreads">--</div>
           <div class="vital-sub">Active kernel threads</div>
+        </div>
+      </div>
+
+      <!-- Top Resource Allocation Chart (Stacked Bar for Mobile & Desktop) -->
+      <div class="card" id="taskDistributionCard" style="margin-bottom: 20px; padding: 16px 20px; display: none;">
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div id="taskCpuDistBar"></div>
+          <div id="taskRamDistBar"></div>
         </div>
       </div>
 
@@ -200,21 +215,90 @@ function renderVitals(container: HTMLElement): void {
 
   const cpuEl = container.querySelector('#vitalCpu');
   const cpuBar = container.querySelector('#vitalCpuBar') as HTMLElement;
+  const cpuDonutEl = container.querySelector('#vitalCpuDonut') as HTMLElement;
+
   const ramEl = container.querySelector('#vitalRam');
   const ramBar = container.querySelector('#vitalRamBar') as HTMLElement;
+  const ramDonutEl = container.querySelector('#vitalRamDonut') as HTMLElement;
+
   const procsEl = container.querySelector('#vitalProcs');
   const procSubEl = container.querySelector('#vitalProcSub');
   const threadsEl = container.querySelector('#vitalThreads');
 
   if (cpuEl) cpuEl.textContent = `${ov.cpu_total_percent.toFixed(1)}%`;
   if (cpuBar) cpuBar.style.width = `${Math.min(ov.cpu_total_percent, 100)}%`;
+  if (cpuDonutEl) {
+    cpuDonutEl.innerHTML = renderDonutGauge(ov.cpu_total_percent, {
+      size: 58,
+      strokeWidth: 6,
+      color: ov.cpu_total_percent > 75 ? '#ef4444' : ov.cpu_total_percent > 40 ? '#f59e0b' : '#38bdf8',
+    });
+  }
 
   if (ramEl) ramEl.textContent = `${ov.memory_used_percent.toFixed(1)}%`;
   if (ramBar) ramBar.style.width = `${Math.min(ov.memory_used_percent, 100)}%`;
+  if (ramDonutEl) {
+    ramDonutEl.innerHTML = renderDonutGauge(ov.memory_used_percent, {
+      size: 58,
+      strokeWidth: 6,
+      color: ov.memory_used_percent > 85 ? '#ef4444' : '#818cf8',
+    });
+  }
 
   if (procsEl) procsEl.textContent = String(ov.total_processes);
   if (procSubEl) procSubEl.textContent = `Running: ${ov.running} | Sleeping: ${ov.sleeping}`;
   if (threadsEl) threadsEl.textContent = String(ov.total_threads);
+
+  // Render Top Resource Consumption Stacked Bars
+  const distCard = container.querySelector('#taskDistributionCard') as HTMLElement;
+  const cpuDistEl = container.querySelector('#taskCpuDistBar') as HTMLElement;
+  const ramDistEl = container.querySelector('#taskRamDistBar') as HTMLElement;
+
+  if (distCard && state.tasks.length > 0) {
+    distCard.style.display = 'block';
+
+    const colors = ['#38bdf8', '#818cf8', '#34d399', '#f59e0b', '#ec4899'];
+
+    // Top 5 by CPU
+    const topCpuTasks = [...state.tasks]
+      .sort((a, b) => b.cpu_percent - a.cpu_percent)
+      .slice(0, 5)
+      .filter((t) => t.cpu_percent > 0.05);
+
+    if (cpuDistEl && topCpuTasks.length > 0) {
+      const cpuSegments: StackedSegment[] = topCpuTasks.map((t, i) => ({
+        label: t.name.length > 14 ? t.name.slice(0, 12) + '..' : t.name,
+        value: t.cpu_percent,
+        color: colors[i % colors.length],
+        displayValue: `${t.cpu_percent.toFixed(1)}%`,
+      }));
+      cpuDistEl.innerHTML = renderStackedBar(cpuSegments, {
+        height: 10,
+        title: 'Top CPU Consumers',
+        showLegend: true,
+      });
+    }
+
+    // Top 5 by RAM
+    const topRamTasks = [...state.tasks]
+      .sort((a, b) => b.memory_bytes - a.memory_bytes)
+      .slice(0, 5)
+      .filter((t) => t.memory_bytes > 1024 * 1024);
+
+    if (ramDistEl && topRamTasks.length > 0) {
+      const ramSegments: StackedSegment[] = topRamTasks.map((t, i) => ({
+        label: t.name.length > 14 ? t.name.slice(0, 12) + '..' : t.name,
+        value: t.memory_bytes,
+        color: colors[i % colors.length],
+        displayValue: t.memory_formatted,
+      }));
+      ramDistEl.innerHTML = renderStackedBar(ramSegments, {
+        height: 10,
+        title: 'Top RAM Consumers',
+        showLegend: true,
+      });
+    }
+  }
 }
 
 function getCpuColorClass(pct: number): string {

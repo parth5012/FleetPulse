@@ -1,7 +1,7 @@
 /**
- * Lightweight SVG Chart Engine for Beszel-style visualizations.
- * Produces crisp, vector-sharp sparklines, area charts, and donut gauges
- * with smooth bezier curves and zero external dependencies.
+ * Lightweight SVG Chart Engine for Visual Telemetry & Mobile Dashboards.
+ * Produces crisp, vector-sharp sparklines, area charts, donut gauges,
+ * stacked resource bars, and multi-ring radial gauges with zero external dependencies.
  */
 
 export interface SparklineOptions {
@@ -37,6 +37,13 @@ export interface AreaChartOptions {
   unit?: string;
   labels?: string[];
   yMax?: number;
+}
+
+export interface StackedSegment {
+  label: string;
+  value: number;
+  color: string;
+  displayValue?: string;
 }
 
 function createSmoothPath(points: { x: number; y: number }[]): string {
@@ -155,9 +162,9 @@ export function renderDonutGauge(percent: number, options: DonutOptions = {}): s
         />
       </svg>
       <div class="donut-gauge-content" style="position:absolute; text-align:center; pointer-events:none;">
-        <div style="font-size:1.15rem; font-weight:700; line-height:1; color:var(--text);">${pct}%</div>
-        ${label ? `<div style="font-size:0.7rem; font-weight:600; text-transform:uppercase; color:var(--text-muted); margin-top:3px;">${label}</div>` : ''}
-        ${sublabel ? `<div style="font-size:0.65rem; color:var(--text-muted); opacity:0.8;">${sublabel}</div>` : ''}
+        <div style="font-size:${size < 80 ? '0.95rem' : '1.15rem'}; font-weight:800; line-height:1; color:var(--text);">${pct}%</div>
+        ${label ? `<div style="font-size:0.65rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-top:2px;">${label}</div>` : ''}
+        ${sublabel ? `<div style="font-size:0.6rem; color:var(--text-muted); opacity:0.8;">${sublabel}</div>` : ''}
       </div>
     </div>
   `;
@@ -181,6 +188,101 @@ export function renderBarGauge(percent: number, label: string, valueStr: string,
       <div class="bar-outer" style="height:7px;">
         <div class="bar-inner" style="width: ${pct}%; background: ${barColor};"></div>
       </div>
+    </div>
+  `;
+}
+
+export function renderStackedBar(
+  segments: StackedSegment[],
+  options: { height?: number; showLegend?: boolean; title?: string } = {}
+): string {
+  const height = options.height || 10;
+  const total = segments.reduce((acc, s) => acc + Math.max(0, s.value), 0) || 1;
+
+  let offset = 0;
+  const barSegmentsSvg = segments
+    .map((s) => {
+      const pct = (Math.max(0, s.value) / total) * 100;
+      const x = offset;
+      offset += pct;
+      if (pct <= 0) return '';
+      return `<rect x="${x}%" y="0" width="${pct}%" height="100%" fill="${s.color}" rx="0" />`;
+    })
+    .join('');
+
+  const legendHtml =
+    options.showLegend !== false
+      ? `
+      <div class="stacked-bar-legend" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; font-size:0.75rem;">
+        ${segments
+          .filter((s) => s.value > 0)
+          .map(
+            (s) => `
+          <div style="display:flex; align-items:center; gap:5px;">
+            <span style="width:8px; height:8px; border-radius:2px; background:${s.color}; display:inline-block;"></span>
+            <span style="color:var(--text-muted);">${s.label}:</span>
+            <strong style="font-family:var(--font-mono); color:var(--text);">${s.displayValue || s.value}</strong>
+          </div>
+        `
+          )
+          .join('')}
+      </div>
+    `
+      : '';
+
+  return `
+    <div class="stacked-bar-wrap" style="width:100%;">
+      ${
+        options.title
+          ? `<div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); margin-bottom:5px; text-transform:uppercase;">${options.title}</div>`
+          : ''
+      }
+      <div style="width:100%; height:${height}px; background:var(--bar-bg); border-radius:99px; overflow:hidden; position:relative;">
+        <svg width="100%" height="100%" preserveAspectRatio="none">
+          ${barSegmentsSvg}
+        </svg>
+      </div>
+      ${legendHtml}
+    </div>
+  `;
+}
+
+export function renderMultiDonut(
+  rings: { percent: number; color: string; label: string }[],
+  size = 140
+): string {
+  const count = rings.length;
+  if (count === 0) return '';
+
+  const strokeWidth = 7;
+  const gap = 3;
+  const maxRadius = (size - strokeWidth) / 2;
+
+  let circlesSvg = '';
+  rings.forEach((r, idx) => {
+    const radius = maxRadius - idx * (strokeWidth + gap);
+    if (radius <= 0) return;
+    const circumference = 2 * Math.PI * radius;
+    const pct = Math.max(0, Math.min(100, r.percent));
+    const offset = circumference - (pct / 100) * circumference;
+
+    // Track circle
+    circlesSvg += `
+      <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="var(--bar-bg)" stroke-width="${strokeWidth}" opacity="0.6" />
+      <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="${r.color}" stroke-width="${strokeWidth}"
+        stroke-dasharray="${circumference.toFixed(1)}"
+        stroke-dashoffset="${offset.toFixed(1)}"
+        stroke-linecap="round"
+        style="transition: stroke-dashoffset 0.6s ease;"
+      />
+    `;
+  });
+
+  return `
+    <div class="multi-donut-wrap" style="display:inline-flex; align-items:center; justify-content:center; position:relative; width:${size}px; height:${size}px;">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform: rotate(-90deg);">
+        ${circlesSvg}
+      </svg>
     </div>
   `;
 }
