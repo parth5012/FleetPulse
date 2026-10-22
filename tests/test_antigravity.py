@@ -10,6 +10,9 @@ if str(project_dir) not in sys.path:
 
 from antigravity import (  # noqa: E402
     AntigravityService,
+    AccountSnapshot,
+    FamilySummary,
+    _phase_ok,
     bucket_for_family,
     classify_family,
     is_exhausted,
@@ -488,3 +491,333 @@ def test_load_accounts_priority(monkeypatch):
     accs = load_accounts()
     assert len(accs) == 1
     assert accs[0]["id"] == "env-acc@gmail.com"
+
+
+import sqlite3  # noqa: E402
+from antigravity import load_omniroute_snapshots  # noqa: E402
+
+
+def test_load_omniroute_snapshots_mocked(tmp_path, monkeypatch):
+    db_file = tmp_path / "storage.sqlite"
+    con = sqlite3.connect(str(db_file))
+    cur = con.cursor()
+    cur.execute(
+        """
+        CREATE TABLE provider_connections (
+            id TEXT PRIMARY KEY,
+            provider TEXT,
+            name TEXT,
+            is_active INTEGER
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE quota_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT,
+            connection_id TEXT,
+            window_key TEXT,
+            remaining_percentage REAL,
+            is_exhausted INTEGER,
+            next_reset_at TEXT,
+            created_at TEXT
+        )
+        """
+    )
+    cur.execute(
+        "INSERT INTO provider_connections VALUES ('conn-1', 'antigravity', 'user@example.com', 1)"
+    )
+    cur.execute(
+        """
+        INSERT INTO quota_snapshots (provider, connection_id, window_key, remaining_percentage, is_exhausted, next_reset_at, created_at)
+        VALUES ('antigravity', 'conn-1', 'gemini-3-flash', 32.5, 0, '2099-01-01T00:00:00Z', '2026-10-20T10:00:00Z')
+        """
+    )
+    cur.execute(
+        """
+        INSERT INTO quota_snapshots (provider, connection_id, window_key, remaining_percentage, is_exhausted, next_reset_at, created_at)
+        VALUES ('antigravity', 'conn-1', 'gemini_weekly', 0.0, 1, '2099-01-01T00:00:00Z', '2026-10-20T10:00:00Z')
+        """
+    )
+    con.commit()
+    con.close()
+
+    monkeypatch.setenv("OMNIROUTE_DB_FILE", str(db_file))
+    monkeypatch.delenv("VERCEL", raising=False)
+
+    snaps = load_omniroute_snapshots()
+    assert "user@example.com" in snaps
+    assert "gemini-3-flash" in snaps["user@example.com"]
+    assert snaps["user@example.com"]["gemini-3-flash"]["remaining"] == pytest.approx(0.325)
+    assert snaps["user@example.com"]["gemini-3-flash"]["is_exhausted"] is False
+    assert snaps["user@example.com"]["gemini_weekly"]["remaining"] == 0.0
+    assert snaps["user@example.com"]["gemini_weekly"]["is_exhausted"] is True
+
+
+@pytest.mark.asyncio
+async def test_fetch_one_applies_omniroute_snapshots(monkeypatch):
+    summary_payload = {
+        "groups": [
+            {
+                "displayName": "Gemini Models",
+                "buckets": [
+                    {"bucketId": "gemini-weekly", "window": "weekly", "remainingFraction": 1.0},
+                    {"bucketId": "gemini-5h", "window": "5h", "remainingFraction": 1.0},
+                ],
+            },
+            {
+                "displayName": "Claude and GPT models",
+                "buckets": [
+                    {"bucketId": "3p-weekly", "window": "weekly", "remainingFraction": 1.0},
+                    {"bucketId": "3p-5h", "window": "5h", "remainingFraction": 1.0},
+                ],
+            },
+        ]
+    }
+
+    async def mock_post(self_client, url, *args, **kwargs):
+        target = str(url)
+        if "retrieveUserQuotaSummary" in target:
+            return httpx.Response(200, json=summary_payload, request=httpx.Request("POST", target))
+        if "retrieveUserQuota" in target:
+            return httpx.Response(200, json={"buckets": []}, request=httpx.Request("POST", target))
+        return httpx.Response(200, json=FETCH_MODELS_PAYLOAD, request=httpx.Request("POST", target))
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    omni_snaps = {
+        "gemini_weekly": {"remaining": 0.0, "is_exhausted": True, "is_active_window": True, "next_reset_at": "2099-01-01T00:00:00Z"},
+        "gemini-3-pro": {"remaining": 0.25, "is_exhausted": False, "is_active_window": True, "next_reset_at": "2099-01-01T00:00:00Z"},
+        "claude_gpt_weekly": {"remaining": 0.45, "is_exhausted": False, "is_active_window": True, "next_reset_at": "2099-01-01T00:00:00Z"},
+    }
+
+    service = AntigravityService(cache_ttl=0.0)
+    async with httpx.AsyncClient() as client:
+        snapshot = await service._fetch_one(
+            client,
+            {"id": "test@example.com", "access_token": "ya29.test"},
+            omni_snapshots=omni_snaps,
+        )
+
+    # Check models enriched
+    models_by_id = {m.model: m for m in snapshot.models}
+    assert models_by_id["gemini-3-pro"].remaining == pytest.approx(0.25)
+
+    # Check groups enriched
+    groups_by_name = {g.displayName: g for g in snapshot.groups}
+    gem_buckets = {b.bucketId: b for b in groups_by_name["Gemini Models"].buckets}
+    assert gem_buckets["gemini-weekly"].remainingFraction == 0.0
+    assert gem_buckets["gemini-5h"].remainingFraction == pytest.approx(0.25)
+
+    claude_buckets = {b.bucketId: b for b in groups_by_name["Claude and GPT models"].buckets}
+    assert claude_buckets["3p-weekly"].remainingFraction == pytest.approx(0.45)
+
+    # Check families enriched
+    fams = {f.family: f for f in snapshot.families if f.window == "weekly"}
+    assert fams["gemini"].remaining == 0.0
+    assert fams["gemini"].exhausted is True
+    assert fams["claude"].remaining == pytest.approx(0.45)
+
+
+@pytest.mark.asyncio
+async def test_fetch_one_applies_user_quota_response(monkeypatch):
+    user_quota_payload = {
+        "buckets": [
+            {
+                "modelId": "claude-sonnet-4-5",
+                "remainingFraction": 0.35,
+                "resetTime": "2026-10-25T10:00:00Z",
+            }
+        ]
+    }
+
+    models_payload = {
+        "models": {
+            "claude-sonnet-4-5": {
+                "quotaInfo": {"remainingFraction": 1.0, "resetTime": "2026-10-03T16:00:00Z"}
+            },
+        }
+    }
+
+    async def mock_post(self_client, url, *args, **kwargs):
+        target = str(url)
+        if "retrieveUserQuota" in target and "retrieveUserQuotaSummary" not in target:
+            return httpx.Response(200, json=user_quota_payload, request=httpx.Request("POST", target))
+        if "retrieveUserQuotaSummary" in target:
+            return httpx.Response(200, json={}, request=httpx.Request("POST", target))
+        return httpx.Response(200, json=models_payload, request=httpx.Request("POST", target))
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+    service = AntigravityService(cache_ttl=0.0)
+    async with httpx.AsyncClient() as client:
+        snapshot = await service._fetch_one(
+            client,
+            {"id": "test@example.com", "access_token": "ya29.test"},
+            omni_snapshots={},
+        )
+
+    models_by_id = {m.model: m for m in snapshot.models}
+    assert models_by_id["claude-sonnet-4-5"].remaining == pytest.approx(0.35)
+    assert models_by_id["claude-sonnet-4-5"].resetTime == "2026-10-25T10:00:00Z"
+
+
+
+def _summary_for(gemini_weekly=None, gemini_5h=None, tp_weekly=None, tp_5h=None):
+    """Build a retrieveUserQuotaSummary-style payload with two groups."""
+    gemini_buckets = []
+    if gemini_weekly is not None:
+        gemini_buckets.append(
+            {"bucketId": "gemini-weekly", "window": "weekly", "remainingFraction": gemini_weekly[0],
+             "resetTime": gemini_weekly[1]}
+        )
+    if gemini_5h is not None:
+        gemini_buckets.append(
+            {"bucketId": "gemini-5h", "window": "5h", "remainingFraction": gemini_5h[0],
+             "resetTime": gemini_5h[1]}
+        )
+    tp_buckets = []
+    if tp_weekly is not None:
+        tp_buckets.append(
+            {"bucketId": "3p-weekly", "window": "weekly", "remainingFraction": tp_weekly[0],
+             "resetTime": tp_weekly[1]}
+        )
+    if tp_5h is not None:
+        tp_buckets.append(
+            {"bucketId": "3p-5h", "window": "5h", "remainingFraction": tp_5h[0],
+             "resetTime": tp_5h[1]}
+        )
+    return {
+        "groups": [
+            {"displayName": "Gemini Models", "buckets": gemini_buckets},
+            {"displayName": "Claude and GPT models", "buckets": tp_buckets},
+        ]
+    }
+
+
+def _fetch_one_with(summary_payload, user_quota_payload, omni_snaps, monkeypatch):
+    async def mock_post(self_client, url, *args, **kwargs):
+        target = str(url)
+        if "retrieveUserQuotaSummary" in target:
+            return httpx.Response(200, json=summary_payload, request=httpx.Request("POST", target))
+        if "retrieveUserQuota" in target:
+            return httpx.Response(200, json=user_quota_payload, request=httpx.Request("POST", target))
+        return httpx.Response(200, json=FETCH_MODELS_PAYLOAD, request=httpx.Request("POST", target))
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+    service = AntigravityService(cache_ttl=0.0)
+    return service
+
+
+@pytest.mark.asyncio
+async def test_weekly_value_not_bled_into_5h_bucket(monkeypatch):
+    """Live repro (brothergaming700): the per-model claude remaining reflects the
+    weekly-constrained pool (47.67%, resets Oct-24) while the true 3p-5h pool is
+    100% (resets tonight). Weekly values must not contaminate the 5h bucket, and
+    the upstream bucket resetTime must not be replaced by the OmniRoute
+    snapshot's fabricated probe+7d reset."""
+    summary = _summary_for(
+        tp_weekly=(0.4767, "2026-10-24T08:00:29Z"),
+        tp_5h=(1.0, "2026-10-22T22:06:15Z"),
+    )
+    user_quota = {
+        "buckets": [
+            {
+                "modelId": "claude-sonnet-4-5",
+                "remainingFraction": 0.4767,
+                "resetTime": "2026-10-24T08:00:29Z",
+            }
+        ]
+    }
+    omni_snaps = {
+        # OmniRoute-recorded reset with a fabricated probe+7d value
+        "claude_gpt_weekly": {
+            "remaining": 0.4767,
+            "is_exhausted": False,
+            "is_active_window": True,
+            "next_reset_at": "2026-10-29T13:05:17.000Z",
+        }
+    }
+    service = _fetch_one_with(summary, user_quota, omni_snaps, monkeypatch)
+    async with httpx.AsyncClient() as client:
+        snapshot = await service._fetch_one(
+            client, {"id": "test@example.com", "access_token": "ya29.test"}, omni_snapshots=omni_snaps
+        )
+
+    gem, tp = snapshot.groups[0], snapshot.groups[1]
+    buckets = {b.bucketId: b for b in tp.buckets}
+    assert buckets["3p-5h"].remainingFraction == pytest.approx(1.0)
+    assert buckets["3p-5h"].resetTime == "2026-10-22T22:06:15Z"
+    assert buckets["3p-weekly"].remainingFraction == pytest.approx(0.4767)
+    # upstream reset wins over the OmniRoute snapshot's probe+7d value
+    assert buckets["3p-weekly"].resetTime == "2026-10-24T08:00:29Z"
+
+
+@pytest.mark.asyncio
+async def test_gemini_5h_not_zeroed_by_weekly_phase_snapshot(monkeypatch):
+    """Live repro (parthchawla5012): gemini weekly is exhausted with an Oct-24
+    reset, and the per-model gemini snapshots are weekly-phased. The 5h bucket
+    (full, resets tonight) previously got min()ed down to 0% with the weekly
+    reset. It must keep its own value and reset."""
+    summary = _summary_for(
+        gemini_weekly=(0.0, "2026-10-24T08:15:34.000Z"),
+        gemini_5h=(1.0, "2026-10-22T18:04:46Z"),
+    )
+    omni_snaps = {
+        "gemini-2.5-pro": {
+            "remaining": 0.0,
+            "is_exhausted": True,
+            "is_active_window": True,
+            "next_reset_at": "2026-10-24T08:15:34.000Z",
+        },
+        "gemini_weekly": {
+            "remaining": 0.0,
+            "is_exhausted": True,
+            "is_active_window": True,
+            "next_reset_at": "2026-10-24T08:15:34.000Z",
+        },
+    }
+    service = _fetch_one_with(summary, {"buckets": []}, omni_snaps, monkeypatch)
+    async with httpx.AsyncClient() as client:
+        snapshot = await service._fetch_one(
+            client, {"id": "test@example.com", "access_token": "ya29.test"}, omni_snapshots=omni_snaps
+        )
+
+    gem, tp = snapshot.groups[0], snapshot.groups[1]
+    buckets = {b.bucketId: b for b in gem.buckets}
+    assert buckets["gemini-5h"].remainingFraction == pytest.approx(1.0)
+    assert buckets["gemini-5h"].resetTime == "2026-10-22T18:04:46Z"
+    assert buckets["gemini-weekly"].remainingFraction == pytest.approx(0.0)
+
+
+def test_build_omniroute_limits_always_has_both_windows():
+    snap = antigravity.AntigravitySnapshot(
+        accounts=[
+            AccountSnapshot(
+                account_id="acc-1@gmail.com",
+                families=[
+                    FamilySummary(family="gemini", window="weekly", remaining=0.0, exhausted=True)
+                ],
+            )
+        ],
+        timestamp="2026-10-22T00:00:00+00:00",
+    )
+    rows = build_omniroute_limits(snap)
+    intervals = {r["resetInterval"] for r in rows if r["apiKeyId"] == "acc-1@gmail.com"}
+    assert intervals == {"5h", "weekly"}
+
+
+def test_phase_ok_modes():
+    bucket_5h = "2026-10-22T22:06:15Z"
+    bucket_weekly = "2026-10-24T08:00:29Z"
+    # weekly-phased value must not blend into the 5h phase...
+    assert _phase_ok("2026-10-24T08:00:29Z", bucket_5h, "5h") is False
+    # ...but same-phase values blend
+    assert _phase_ok(bucket_5h, bucket_5h, "5h") is True
+    assert _phase_ok("2026-10-22T22:06:15Z", bucket_5h, "5h") is True
+    # weekly buckets only take values carrying the same weekly reset phase
+    assert _phase_ok("2026-10-24T08:00:29Z", bucket_weekly, "weekly") is True
+    assert _phase_ok("2026-10-22T22:06:15Z", bucket_weekly, "weekly") is False
+    # no bucket reset phase -> blend (previous behavior preserved)
+    assert _phase_ok(None, None, "5h") is True

@@ -1,5 +1,27 @@
 # Iteration Log
 
+## 2026-10-22: Antigravity — fix cross-window weekly/5h quota contamination
+
+### Status: Done
+
+### What Changed:
+1. **Phase-aware bucket blending (`antigravity.py`)**:
+   - Added pure helpers `_parse_ts()` and `_phase_ok()` (`PHASE_TOLERANCE_SEC = 600s`). Upstream `retrieveUserQuota` per-model values report the *most binding* window together with that window's resetTime; a value now only blends into a group bucket when the reset phases match — a weekly-constrained remaining can no longer be min()ed into a 5h bucket and vice versa. 5h buckets accept resets at-or-before the bucket's; weekly buckets only accept the same weekly reset phase.
+   - Upstream bucket `resetTime` is never demoted: OmniRoute snapshot / entry reset times are only adopted when the bucket has none of its own. This stops OmniRoute's fabricated probe+7d weekly resets (recorded for untried pools) from replacing the true upstream weekly countdown.
+2. **OmniRoute limit sync (`build_omniroute_limits`)**: every account now always gets BOTH `5h` and `weekly` rows (upstream hides 5h buckets when a family's weekly pool is exhausted, which previously dropped the 5h token-limit row, e.g. for parpdon5012).
+3. **Tests (`tests/test_antigravity.py`)**: 4 new regression tests — live repros for brothergaming700 (weekly value bleeding into 3p-5h + fabricated reset) and parthchawla5012 (gemini 5h zeroed by weekly-phased snapshot), the both-windows sync guarantee, and `_phase_ok()` unit coverage.
+
+### Verification Results:
+- Unit & integration tests: 84 python tests passed (pytest), including the 4 new ones.
+- Typecheck & build: `tsc -b && vite build` clean.
+- Live verification: restarted `dashboard-service.service`; `/api/antigravity/limits` now matches the raw `retrieveUserQuotaSummary` upstream values exactly (brothergaming 3p-5h = 100% reset tonight instead of the weekly 47.67%; weekly keeps its true Oct-24 reset; parthchawla gemini-5h shows its own 100%/Capped instead of 0% + weekly reset).
+- `ocr-review`: Skipped (no UI change; frontend untouched in this iteration).
+
+### Retrospective:
+- **What went well:** comparing served JSON against the raw upstream RPC directly pinpointed the blending error in minutes.
+- **What broke:** Google fabricates weekly reset times (probe+7d) and 100% remainings for untried pools — those fabricated values transit via OmniRoute snapshots; the dashboard can no longer inherit them once upstream reports its own phase.
+- **Next improvement:** root-causing the fabrication lives in OmniRoute's `usage/antigravityWeeklyQuota.ts` — worth an issue upstream there if weekly numbers ever again disagree with the agy CLI.
+
 ## 2026-10-18: Beszel & Dozzel Visual Dashboards Implementation
 
 ### Status: Done

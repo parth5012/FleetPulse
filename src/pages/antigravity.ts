@@ -335,6 +335,24 @@ export async function renderAntigravity(container: HTMLElement): Promise<void> {
           });
         });
 
+        if (accCount === 0 && a.families && a.families.length > 0) {
+          a.families.forEach((f) => {
+            const frac = Number(f.remaining || 0);
+            totalFractionSum += frac;
+            totalBuckets++;
+            accFraction += frac;
+            accCount++;
+
+            if (f.family === 'gemini') {
+              geminiFractionSum += frac;
+              geminiBuckets++;
+            } else if (f.family === 'claude' || f.family === 'openai') {
+              claudeFractionSum += frac;
+              claudeBuckets++;
+            }
+          });
+        }
+
         const avgScore = accCount > 0 ? Math.round((accFraction / accCount) * 100) : 100;
         const shortName = a.account_id.split('@')[0];
         accountSegments.push({

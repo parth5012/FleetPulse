@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
@@ -31,6 +31,10 @@ FETCH_MODELS_URL = os.environ.get(
 QUOTA_SUMMARY_URL = os.environ.get(
     "ANTIGRAVITY_QUOTA_SUMMARY_URL",
     "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+)
+USER_QUOTA_URL = os.environ.get(
+    "ANTIGRAVITY_USER_QUOTA_URL",
+    "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
 )
 OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"
 DEFAULT_TOKEN_FILE = os.environ.get(
@@ -241,6 +245,82 @@ def load_accounts_from_omniroute() -> List[Dict[str, str]]:
         return []
 
 
+def load_omniroute_snapshots() -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """Load latest per-window quota snapshots for active connections from OmniRoute SQLite."""
+    try:
+        if os.environ.get("VERCEL"):
+            return {}
+
+        raw_db = os.environ.get("OMNIROUTE_DB_FILE", "~/.omniroute/storage.sqlite")
+        try:
+            db_path = Path(raw_db).expanduser()
+            if not db_path.exists():
+                return {}
+        except Exception:
+            return {}
+
+        try:
+            con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+            cur = con.cursor()
+            rows = cur.execute(
+                """
+                SELECT p.name, p.id, s.window_key, s.remaining_percentage, s.is_exhausted, s.next_reset_at, s.created_at
+                FROM (
+                    SELECT *, ROW_NUMBER() OVER (
+                        PARTITION BY connection_id, window_key ORDER BY created_at DESC, id DESC
+                    ) AS rn
+                    FROM quota_snapshots
+                ) s
+                JOIN provider_connections p ON s.connection_id = p.id
+                WHERE s.rn = 1 AND p.is_active = 1 AND p.provider IN ('agy', 'antigravity')
+                """
+            ).fetchall()
+            con.close()
+        except Exception:
+            return {}
+
+        now = datetime.now(timezone.utc)
+        snapshots: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        for name, cid, window_key, rem_pct, is_exh, next_reset, created_at in rows:
+            acc_id = _clean(name) or _clean(cid)
+            if not acc_id or not window_key:
+                continue
+
+            is_active_window = True
+            if next_reset:
+                try:
+                    reset_dt = datetime.fromisoformat(str(next_reset).replace("Z", "+00:00"))
+                    if reset_dt.tzinfo is None:
+                        reset_dt = reset_dt.replace(tzinfo=timezone.utc)
+                    if reset_dt < now:
+                        is_active_window = False
+                except Exception:
+                    pass
+
+            rem_val = float(rem_pct) / 100.0 if rem_pct is not None else 1.0
+            rem_val = max(0.0, min(1.0, rem_val))
+            exhausted = bool(is_exh) or rem_val <= EXHAUSTED_THRESHOLD
+
+            info = {
+                "remaining": 0.0 if exhausted else rem_val,
+                "is_exhausted": exhausted,
+                "next_reset_at": str(next_reset) if next_reset else None,
+                "created_at": str(created_at) if created_at else None,
+                "is_active_window": is_active_window,
+            }
+
+            for key in {acc_id, _clean(cid)}:
+                if not key:
+                    continue
+                if key not in snapshots:
+                    snapshots[key] = {}
+                snapshots[key][str(window_key)] = info
+
+        return snapshots
+    except Exception:
+        return {}
+
+
 def load_accounts() -> List[Dict[str, str]]:
     """Read account registry: env if present, otherwise auto-discover from local OmniRoute."""
     try:
@@ -396,6 +476,44 @@ def is_exhausted(remaining: float, threshold: float = EXHAUSTED_THRESHOLD) -> bo
         return True
 
 
+PHASE_TOLERANCE_SEC = 600.0
+
+
+def _parse_ts(value: Any) -> Optional[datetime]:
+    """Parse an RFC3339-ish timestamp; returns None when missing/invalid."""
+    if not value:
+        return None
+    try:
+        moment = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment
+
+
+def _phase_ok(entry_reset: Optional[str], bucket_reset: Optional[str], mode: str) -> bool:
+    """True when a per-model/snapshot value may blend into a bucket window.
+
+    Upstream per-model quotas report the *most binding* window's remaining together
+    with that window's resetTime. Strict (5h) windows reset sooner, so a binding 5h
+    value carries a reset at-or-before the 5h bucket's reset, while a
+    weekly-constrained value carries a strictly later reset. Weekly buckets must
+    therefore only blend values carrying the same weekly reset phase. When either
+    side has no reset phase, fall back to the previous blend-everything behavior.
+    """
+    bucket_dt = _parse_ts(bucket_reset)
+    if bucket_dt is None:
+        return True
+    entry_dt = _parse_ts(entry_reset)
+    if entry_dt is None:
+        return False
+    delta = (entry_dt - bucket_dt).total_seconds()
+    if mode == "weekly":
+        return abs(delta) <= PHASE_TOLERANCE_SEC
+    return delta <= PHASE_TOLERANCE_SEC
+
+
 def summarize_family(family: str, entries: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Aggregate one family's entries by minimum remaining (most constrained)."""
     relevant = [e for e in (entries or []) if e.get("family") == family]
@@ -490,9 +608,23 @@ class AntigravityService:
             json={"project": account.get("projectId") or ""},
         )
 
+    async def _post_user_quota(
+        self, client: httpx.AsyncClient, account: Dict[str, str], access_token: str
+    ) -> httpx.Response:
+        return await client.post(
+            USER_QUOTA_URL,
+            headers=self._headers_for(access_token),
+            json={"project": account.get("projectId") or ""},
+        )
+
     async def _fetch_one(
-        self, client: httpx.AsyncClient, account: Dict[str, str]
+        self,
+        client: httpx.AsyncClient,
+        account: Dict[str, str],
+        omni_snapshots: Optional[Dict[str, Any]] = None,
     ) -> AccountSnapshot:
+        if omni_snapshots is None:
+            omni_snapshots = load_omniroute_snapshots().get(account.get("id", ""), {})
         tokens = self._effective_tokens(account)
         if not tokens.get("access_token"):
             bootstrapped = await self._try_renew_from_account(client, account)
@@ -542,6 +674,50 @@ class AntigravityService:
             raw_entries.append(parsed)
             entries.append(QuotaEntry(**parsed))
 
+        # Query live per-model user quota endpoint
+        user_quota_entries: Dict[str, Dict[str, Any]] = {}
+        try:
+            uq_resp = await self._post_user_quota(client, account, tokens["access_token"])
+            if uq_resp.status_code == 200:
+                for b in (uq_resp.json() or {}).get("buckets", []):
+                    mid = _clean(b.get("modelId"))
+                    if mid:
+                        user_quota_entries[mid] = b
+        except Exception:
+            pass
+
+        # Enrich entries with live user quotas and OmniRoute snapshots
+        for e in entries:
+            uq = user_quota_entries.get(e.model)
+            if uq:
+                rf = uq.get("remainingFraction")
+                if rf is not None:
+                    try:
+                        e.remaining = min(e.remaining, max(0.0, min(1.0, float(rf))))
+                    except (TypeError, ValueError):
+                        pass
+                if uq.get("resetTime"):
+                    e.resetTime = str(uq["resetTime"])
+
+            m_snap = omni_snapshots.get(e.model)
+            if m_snap and m_snap.get("is_active_window"):
+                e.remaining = min(e.remaining, m_snap["remaining"])
+                if m_snap.get("is_exhausted"):
+                    e.remaining = 0.0
+                if m_snap.get("next_reset_at"):
+                    e.resetTime = str(m_snap["next_reset_at"])
+
+        raw_entries = [
+            {
+                "model": e.model,
+                "family": e.family,
+                "window": e.window,
+                "remaining": e.remaining,
+                "resetTime": e.resetTime,
+            }
+            for e in entries
+        ]
+
         # Query rich quota summary endpoint (categories & buckets)
         groups: List[QuotaGroup] = []
         try:
@@ -573,6 +749,89 @@ class AntigravityService:
                     )
         except Exception:
             groups = []
+
+        # Enrich group buckets with OmniRoute snapshots and per-model consumption.
+        # Per-model / user-quota values report the *most binding* window together
+        # with that window's reset phase, so a value only blends into a bucket
+        # carrying the same phase: weekly-constrained remainings must never be
+        # min()ed into a 5h bucket and vice versa. The upstream bucket resetTime
+        # always wins; OmniRoute/entry resets are only adopted when absent.
+        def _blend_snapshot(b: QuotaBucket, snap: Optional[Dict[str, Any]], phase: str) -> None:
+            if not (snap and snap.get("is_active_window")):
+                return
+            if not _phase_ok(snap.get("next_reset_at"), b.resetTime, phase):
+                return
+            b.remainingFraction = min(b.remainingFraction, float(snap.get("remaining", 1.0)))
+            if not b.resetTime and snap.get("next_reset_at"):
+                b.resetTime = str(snap["next_reset_at"])
+
+        def _blend_entries(b: QuotaBucket, subset: List[QuotaEntry], phase: str) -> None:
+            phased = [e for e in subset if _phase_ok(e.resetTime, b.resetTime, phase)]
+            if not phased:
+                return
+            b.remainingFraction = min(b.remainingFraction, min(e.remaining for e in phased))
+            if not b.resetTime:
+                resets = sorted(e.resetTime for e in phased if e.resetTime)
+                if resets:
+                    b.resetTime = resets[0]
+
+        for g in groups:
+            is_gem = "gemini" in g.displayName.lower()
+            is_3p = any(k in g.displayName.lower() for k in ("claude", "gpt", "3p"))
+            for b in g.buckets:
+                w = (b.window or "").lower()
+                bid = (b.bucketId or "").lower()
+                mode = "weekly" if ("weekly" in bid or w == "weekly") else "5h"
+                if is_gem:
+                    if mode == "weekly":
+                        _blend_snapshot(b, omni_snapshots.get("gemini_weekly"), "weekly")
+                        _blend_entries(
+                            b,
+                            [e for e in entries if e.family == "gemini" and e.window == "weekly"],
+                            "weekly",
+                        )
+                    else:  # 5h window
+                        gem_5h_snaps = [
+                            s
+                            for k, s in omni_snapshots.items()
+                            if classify_family(k) == "gemini"
+                            and k != "gemini_weekly"
+                            and s.get("is_active_window")
+                        ]
+                        if gem_5h_snaps:
+                            for snap in gem_5h_snaps:
+                                _blend_snapshot(b, snap, "5h")
+                        else:
+                            _blend_entries(
+                                b, [e for e in entries if e.family == "gemini"], "5h"
+                            )
+                elif is_3p:
+                    if mode == "weekly":
+                        _blend_snapshot(b, omni_snapshots.get("claude_gpt_weekly"), "weekly")
+                        _blend_entries(
+                            b,
+                            [
+                                e
+                                for e in entries
+                                if e.family in ("claude", "openai") and e.window == "weekly"
+                            ],
+                            "weekly",
+                        )
+                    else:  # 5h window
+                        tp_5h_snaps = [
+                            s
+                            for k, s in omni_snapshots.items()
+                            if classify_family(k) in ("claude", "openai")
+                            and k != "claude_gpt_weekly"
+                            and s.get("is_active_window")
+                        ]
+                        if tp_5h_snaps:
+                            for snap in tp_5h_snaps:
+                                _blend_snapshot(b, snap, "5h")
+                        else:
+                            _blend_entries(
+                                b, [e for e in entries if e.family in ("claude", "openai")], "5h"
+                            )
 
         # Build family summaries
         families: List[FamilySummary] = []
@@ -695,10 +954,14 @@ class AntigravityService:
             return AntigravitySnapshot(
                 accounts=[], cached=False, timestamp=now_iso, error=error_msg
             )
+        all_snapshots = load_omniroute_snapshots()
         timeout = httpx.Timeout(15.0)
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                snapshots = [await self._fetch_one(client, acc) for acc in accounts]
+                snapshots = [
+                    await self._fetch_one(client, acc, all_snapshots.get(acc["id"], {}))
+                    for acc in accounts
+                ]
             errors = [s.error for s in snapshots if s.error]
             return AntigravitySnapshot(
                 accounts=snapshots,
@@ -749,7 +1012,10 @@ def build_omniroute_limits(snapshot: AntigravitySnapshot) -> List[Dict[str, Any]
     rows: List[Dict[str, Any]] = []
     seen = set()
     for account in snapshot.accounts:
-        windows = {f.window for f in account.families} or {"5h", "weekly"}
+        # Both windows must always be present per account: upstream omits 5h
+        # buckets entirely when a family's weekly pool is exhausted, which
+        # previously dropped the OmniRoute 5h token-limit row.
+        windows = {"5h", "weekly"} | {f.window for f in account.families}
         for window in sorted(windows):
             key = (account.account_id, window)
             if key in seen:
@@ -871,7 +1137,7 @@ FALLBACK_HTML = """<!DOCTYPE html>
     }
     function load(refresh){
       document.getElementById('pill').textContent='Loading...';
-      fetch('/api/antigravity/limits'+(refresh?'?refresh=true': '')).then(function(r){return r.json()}).then(render)
+      fetch('/api/antigravity/limits?refresh=true').then(function(r){return r.json()}).then(render)
         .catch(function(e){document.getElementById('list').innerHTML='<div class="empty"><b>Unable to load</b><p>'+esc(e.message)+'</p></div>'});
     }
     document.getElementById('refreshBtn').onclick=function(){load(true)};
@@ -906,7 +1172,11 @@ async def get_antigravity_limits(
         return RedirectResponse(url="/antigravity", status_code=303)
     try:
         service = get_antigravity_service()
-        return await service.get_snapshot(refresh=refresh)
+        snapshot = await service.get_snapshot(refresh=refresh)
+        return JSONResponse(
+            content=snapshot.model_dump(),
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"},
+        )
     except Exception as exc:
         now_iso = datetime.now(timezone.utc).isoformat()
         return AntigravitySnapshot(
