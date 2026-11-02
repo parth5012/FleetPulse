@@ -5,10 +5,18 @@
  * radial bucket meters, countdown reset dials, and mobile-first layouts.
  */
 
-import { fetchLimits, syncOmniRoute } from '../lib/api';
+import { fetchLimits, fetchQoderLimits, syncOmniRoute } from '../lib/api';
 import { esc, formatTimeRemaining } from '../lib/format';
 import { renderDonutGauge, renderStackedBar, StackedSegment } from '../lib/charts';
-import type { AccountSnapshot, QuotaBucket, QuotaGroup } from '../lib/api';
+import type {
+  AccountSnapshot,
+  QuotaBucket,
+  QuotaGroup,
+  QoderAccountSnapshot,
+  QoderQuotaAmount,
+  QoderSharedPool,
+  QoderResourcePackage,
+} from '../lib/api';
 
 function getBucketStatus(bucket: QuotaBucket): {
   pct: number;
@@ -209,6 +217,189 @@ function renderAccount(acc: AccountSnapshot): string {
   `;
 }
 
+// ---------------------------------------------------------------------------
+// Qoder CLI Account Quota (dt- device token, /api/v2/quota/usage)
+// ---------------------------------------------------------------------------
+function safeUrl(url: string | undefined | null): string {
+  const value = (url || '').trim();
+  return /^https:\/\//i.test(value) ? value : '';
+}
+
+function qoderStatusColor(fraction: number): { statusClass: string; statusText: string; color: string } {
+  const pct = Math.round(fraction * 100);
+  if (fraction <= 0.001) {
+    return { statusClass: 'low', statusText: '0% Exhausted', color: '#ef4444' };
+  }
+  if (pct < 20) {
+    return { statusClass: 'med', statusText: `${pct}% Low`, color: '#f59e0b' };
+  }
+  return { statusClass: 'ok', statusText: `${pct}%`, color: '#10b981' };
+}
+
+function renderQoderAmountBar(title: string, amount: QoderQuotaAmount, poolLabel: string): string {
+  const total = Number(amount.total || 0);
+  const used = Number(amount.used || 0);
+  const fraction = total > 0 ? Math.max(0, Math.min(1, (total - used) / total)) : 0;
+  const { statusClass, statusText, color } = qoderStatusColor(fraction);
+  const unit = esc(amount.unit || 'credits');
+  return `
+    <div class="visual-bucket-card">
+      <div class="visual-bucket-left">
+        ${renderDonutGauge(Math.round(fraction * 100), {
+          size: window.innerWidth <= 640 ? 48 : 56,
+          strokeWidth: window.innerWidth <= 640 ? 5 : 6,
+          color,
+          trackColor: 'var(--bar-bg)',
+        })}
+      </div>
+      <div class="visual-bucket-body">
+        <div class="bucket-top-row">
+          <div class="bucket-title-wrap">
+            <strong class="bucket-display-name">${esc(title)}</strong>
+          </div>
+          <span class="pct-badge pct-${statusClass}">${statusText}</span>
+        </div>
+        <div class="bucket-bar-track">
+          <div class="bucket-bar-fill bar-${statusClass}" style="width: ${Math.round(fraction * 100)}%;"></div>
+        </div>
+        <div class="bucket-sub-row">
+          <span class="bucket-desc-text">${used.toLocaleString()} / ${total.toLocaleString()} ${unit} ${esc(poolLabel)}</span>
+          ${safeUrl(amount.detailUrl) ? `<a class="reset-badge" href="${esc(safeUrl(amount.detailUrl))}" target="_blank" rel="noopener">Details ↗</a>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderQoderPoolBar(title: string, pool: QoderSharedPool): string {
+  const cap = Number(pool.cap || 0);
+  const used = Number(pool.used || 0);
+  const fraction = cap > 0 ? Math.max(0, Math.min(1, (cap - used) / cap)) : 0;
+  const { statusClass, statusText, color } = qoderStatusColor(pool.available === false ? 0 : fraction);
+  const unit = esc(pool.unit || 'credits');
+  return `
+    <div class="visual-bucket-card">
+      <div class="visual-bucket-left">
+        ${renderDonutGauge(Math.round(fraction * 100), {
+          size: window.innerWidth <= 640 ? 48 : 56,
+          strokeWidth: window.innerWidth <= 640 ? 5 : 6,
+          color,
+          trackColor: 'var(--bar-bg)',
+        })}
+      </div>
+      <div class="visual-bucket-body">
+        <div class="bucket-top-row">
+          <div class="bucket-title-wrap">
+            <strong class="bucket-display-name">${esc(title)}</strong>
+          </div>
+          <span class="pct-badge pct-${statusClass}">${statusText}</span>
+        </div>
+        <div class="bucket-bar-track">
+          <div class="bucket-bar-fill bar-${statusClass}" style="width: ${Math.round(fraction * 100)}%;"></div>
+        </div>
+        <div class="bucket-sub-row">
+          <span class="bucket-desc-text">${used.toLocaleString()} / ${cap.toLocaleString()} ${unit} used</span>
+          ${pool.available === false ? '<span class="reset-badge text-muted">Unavailable</span>' : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderQoderPackage(pkg: QoderResourcePackage): string {
+  const total = Number(pkg.total || 0);
+  const used = Number(pkg.used || 0);
+  const fraction = total > 0 ? Math.max(0, Math.min(1, (total - used) / total)) : 0;
+  const { statusClass, statusText, color } = qoderStatusColor(fraction);
+  const resetStr = pkg.expiresAt ? formatTimeRemaining(new Date(pkg.expiresAt).toISOString()) : '';
+  return `
+    <div class="visual-bucket-card">
+      <div class="visual-bucket-left">
+        ${renderDonutGauge(Math.round(fraction * 100), {
+          size: window.innerWidth <= 640 ? 48 : 56,
+          strokeWidth: window.innerWidth <= 640 ? 5 : 6,
+          color,
+          trackColor: 'var(--bar-bg)',
+        })}
+      </div>
+      <div class="visual-bucket-body">
+        <div class="bucket-top-row">
+          <div class="bucket-title-wrap">
+            <strong class="bucket-display-name">${esc(pkg.name || pkg.id)}</strong>
+            ${pkg.status && pkg.status !== 'QUOTA_DETAIL_STATUS_UNSPECIFIED' ? `<span class="window-pill">${esc(pkg.status.replace('QUOTA_DETAIL_STATUS_', ''))}</span>` : ''}
+          </div>
+          <span class="pct-badge pct-${statusClass}">${statusText}</span>
+        </div>
+        <div class="bucket-bar-track">
+          <div class="bucket-bar-fill bar-${statusClass}" style="width: ${Math.round(fraction * 100)}%;"></div>
+        </div>
+        <div class="bucket-sub-row">
+          <span class="bucket-desc-text">${used.toLocaleString()} / ${total.toLocaleString()} ${esc(pkg.unit || 'credits')}</span>
+          ${resetStr ? `<span class="reset-badge">⏳ ${esc(resetStr)}</span>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderQoderAccount(acc: QoderAccountSnapshot): string {
+  const initial = (acc.account_id || '?')[0].toUpperCase();
+  const plan = acc.userQuota;
+  const total = Number(plan?.total || 0);
+  const used = Number(plan?.used || 0);
+  const healthPct = total > 0 ? Math.round(Math.max(0, Math.min(1, (total - used) / total)) * 100) : 100;
+  const isMobile = window.innerWidth <= 640;
+
+  const healthDonut = renderDonutGauge(healthPct, {
+    size: isMobile ? 52 : 64,
+    strokeWidth: isMobile ? 5 : 6,
+    label: 'Quota',
+    color: healthPct > 50 ? '#10b981' : healthPct > 20 ? '#f59e0b' : '#ef4444',
+  });
+
+  const trialStr = acc.expiresAt
+    ? formatTimeRemaining(new Date(acc.expiresAt).toISOString())
+    : '';
+
+  let bodyHtml = '';
+  if (acc.error) {
+    bodyHtml = `<div class="error-banner">⚠️ ${esc(acc.error)}</div>`;
+  } else {
+    const sections: string[] = [];
+    if (plan) sections.push(renderQoderAmountBar('Plan Credits', plan, 'used'));
+    if (acc.addOnQuota) sections.push(renderQoderAmountBar('Add-On Credits', acc.addOnQuota, 'used'));
+    if (acc.sharedQuota) sections.push(renderQoderPoolBar('Shared Org Pool', acc.sharedQuota));
+    (acc.packages || []).forEach((pkg) => sections.push(renderQoderPackage(pkg)));
+    if (acc.isQuotaExceeded) {
+      sections.push('<div class="error-banner">⚠️ Plan quota exhausted — upgrade required.</div>');
+    }
+    bodyHtml = sections.length > 0
+      ? sections.join('')
+      : '<div class="empty-state"><p>No quota pools reported for this account.</p></div>';
+  }
+
+  return `
+    <div class="account-card">
+      <div class="account-header">
+        <div class="account-title-wrap">
+          <div class="account-avatar">${initial}</div>
+          <div class="account-meta">
+            <strong class="account-name">${esc(acc.account_id)}</strong>
+            <span class="account-sub">Qoder CLI · ${esc(acc.userType || 'account')}${trialStr ? ` · trial: ${esc(trialStr)}` : ''}</span>
+          </div>
+        </div>
+        <div class="account-header-gauge">
+          ${healthDonut}
+        </div>
+      </div>
+      <div class="account-body">
+        ${bodyHtml}
+        ${safeUrl(acc.upgradeUrl) ? `<a class="model-chip" href="${esc(safeUrl(acc.upgradeUrl))}" target="_blank" rel="noopener">⬆ Upgrade plan</a>` : ''}
+      </div>
+    </div>
+  `;
+}
+
 export async function renderAntigravity(container: HTMLElement): Promise<void> {
   container.innerHTML = `
     <div class="antigravity-page">
@@ -279,6 +470,12 @@ export async function renderAntigravity(container: HTMLElement): Promise<void> {
       <!-- Accounts List -->
       <div id="accountsList" style="margin-top:20px;">
         <div class="loading-state"><div class="spin">⚡</div><p>Querying OmniRoute token vaults...</p></div>
+      </div>
+
+      <!-- Qoder CLI Accounts -->
+      <div id="qoderSection" style="display:none;">
+        <div class="page-badge" style="margin:28px 4px 12px;">⌨️ QODER CLI ACCOUNTS</div>
+        <div id="qoderList"></div>
       </div>
     </div>
   `;
@@ -448,6 +645,36 @@ export async function renderAntigravity(container: HTMLElement): Promise<void> {
       livePill.textContent = 'Fetch Error';
       livePill.className = 'pill';
       console.error('Antigravity fetch error:', err);
+    }
+
+    loadQoderData(refresh);
+  }
+
+  const qoderSection = container.querySelector('#qoderSection') as HTMLElement;
+  const qoderList = container.querySelector('#qoderList') as HTMLElement;
+
+  async function loadQoderData(refresh: boolean): Promise<void> {
+    try {
+      const qoder = await fetchQoderLimits(refresh);
+      const accounts = qoder.accounts || [];
+      if (accounts.length === 0) {
+        // No accounts configured — keep the section hidden
+        qoderSection.style.display = 'none';
+        return;
+      }
+      qoderSection.style.display = 'block';
+      const errors = accounts.filter((a) => a.error).length;
+      qoderList.innerHTML = accounts.map(renderQoderAccount).join('');
+      if (errors > 0 && errors === accounts.length) {
+        // All accounts failing usually means the captured CLI token went stale
+        const hint = document.createElement('div');
+        hint.className = 'empty-state';
+        hint.innerHTML = '<p>Tip: re-capture the Qoder CLI device token to refresh access.</p>';
+        qoderList.appendChild(hint);
+      }
+    } catch (err) {
+      console.error('Qoder fetch error:', err);
+      qoderSection.style.display = 'none';
     }
   }
 

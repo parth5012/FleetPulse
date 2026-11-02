@@ -41,6 +41,61 @@ export interface AntigravitySnapshot {
   error?: string | null;
 }
 
+export interface QoderQuotaAmount {
+  total?: number;
+  used?: number;
+  remaining?: number;
+  percentage?: number | null;
+  unit?: string;
+  detailUrl?: string | null;
+}
+
+export interface QoderSharedPool {
+  used?: number;
+  cap?: number;
+  remaining?: number;
+  percentage?: number | null;
+  available?: boolean;
+  unit?: string;
+}
+
+export interface QoderResourcePackage {
+  id: string;
+  name?: string;
+  description?: string;
+  total?: number;
+  used?: number;
+  remaining?: number;
+  percentage?: number | null;
+  unit?: string;
+  available?: boolean;
+  status?: string;
+  expiresAt?: number | null;
+}
+
+export interface QoderAccountSnapshot {
+  account_id: string;
+  userId?: string;
+  userType?: string;
+  usageType?: string;
+  totalUsagePercentage?: number | null;
+  isQuotaExceeded?: boolean;
+  expiresAt?: number | null;
+  upgradeUrl?: string;
+  userQuota?: QoderQuotaAmount | null;
+  addOnQuota?: QoderQuotaAmount | null;
+  sharedQuota?: QoderSharedPool | null;
+  packages?: QoderResourcePackage[];
+  error?: string | null;
+}
+
+export interface QoderSnapshot {
+  accounts: QoderAccountSnapshot[];
+  cached?: boolean;
+  timestamp: string;
+  error?: string | null;
+}
+
 function getApiBase(): string {
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/dashboard')) {
     return '/dashboard';
@@ -57,6 +112,13 @@ export async function fetchLimits(refresh = false): Promise<AntigravitySnapshot>
 
 export async function syncOmniRoute(): Promise<unknown> {
   const res = await fetch(`${getApiBase()}/api/antigravity/sync`, { method: 'POST' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchQoderLimits(refresh = false): Promise<QoderSnapshot> {
+  const url = `${getApiBase()}/api/qoder/limits${refresh ? '?refresh=true' : ''}`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
