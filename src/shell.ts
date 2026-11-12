@@ -22,6 +22,7 @@ export function renderShell(root: HTMLElement): void {
           <a href="#/journal" data-route="/journal">📜 Journal</a>
           <a href="#/maintenance" data-route="/maintenance">🛠️ Maintenance</a>
           <a href="#/containers" data-route="/containers">🐳 Containers</a>
+          <a href="#/apps" data-route="/apps">🚀 Apps</a>
           <a href="#/antigravity" data-route="/antigravity">🔮 Quotas</a>
         </nav>
 
@@ -72,6 +73,10 @@ export function renderShell(root: HTMLElement): void {
         <a href="#/containers" data-route="/containers" class="nav-item">
           <span class="nav-icon">🐳</span>
           <span class="nav-label">Fleet</span>
+        </a>
+        <a href="#/apps" data-route="/apps" class="nav-item">
+          <span class="nav-icon">🚀</span>
+          <span class="nav-label">Apps</span>
         </a>
         <a href="#/antigravity" data-route="/antigravity" class="nav-item">
           <span class="nav-icon">🔮</span>

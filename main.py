@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from antigravity import router as antigravity_router
+from apps import router as apps_router
 from containers import router as containers_router
 from journal_inspector import router as journal_router
 from maintenance import router as maintenance_router
@@ -22,6 +23,7 @@ app = FastAPI(title="Dashboard Service", version="0.2.0")
 
 # Mount API routers at root
 app.include_router(antigravity_router)
+app.include_router(apps_router)
 app.include_router(qoder_router)
 app.include_router(system_router)
 app.include_router(containers_router)
@@ -33,6 +35,7 @@ app.include_router(maintenance_router)
 
 # Mount API routers under /dashboard prefix for reverse proxy / path prefix setups
 app.include_router(antigravity_router, prefix="/dashboard")
+app.include_router(apps_router, prefix="/dashboard")
 app.include_router(qoder_router, prefix="/dashboard")
 app.include_router(system_router, prefix="/dashboard")
 app.include_router(containers_router, prefix="/dashboard")

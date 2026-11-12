@@ -6,5 +6,6 @@ __pycache__/
 tsconfig.tsbuildinfo
 .tmp/
 .env
-data/
+data/*
+!data/curated_apps.json
 *.db

@@ -3086,3 +3086,51 @@ button, input, select {
   height: 10px;
   border-radius: 2px;
 }
+
+/* Curated Apps page */
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.app-card {
+  background: var(--card-bg, #1e1e2e);
+  border: 1px solid var(--border, #2a2a3c);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.app-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.app-icon {
+  font-size: 1.6rem;
+}
+.app-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+.app-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: .82rem;
+  color: var(--text-muted, #aaa);
+  word-break: break-all;
+}
+.app-card-meta a { color: var(--accent, #7aa2f7); }
+.app-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.app-card-actions button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}

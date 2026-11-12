@@ -16,6 +16,7 @@ const routes: Record<string, () => Promise<RenderFn>> = {
   },
   '/system': async () => (await import('./pages/system')).renderSystem,
   '/containers': async () => (await import('./pages/containers')).renderContainers,
+  '/apps': async () => (await import('./pages/apps')).renderApps,
   '/antigravity': async () => (await import('./pages/antigravity')).renderAntigravity,
   '/network': async () => {
     const mod = await import('./pages/network');

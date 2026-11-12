@@ -653,3 +653,45 @@ export async function triggerServiceRestartShortcut(unit: string): Promise<{ suc
   }
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Curated Apps (one-click start/stop)
+// ---------------------------------------------------------------------------
+export interface CuratedApp {
+  name: string;
+  title: string;
+  description: string;
+  container: string;
+  state: string;
+  running: boolean;
+  url: string;
+  icon: string;
+  compose_dir: string;
+}
+
+export interface AppsResponse {
+  apps: CuratedApp[];
+  timestamp: string;
+}
+
+export async function fetchApps(): Promise<AppsResponse> {
+  const res = await fetch(`${getApiBase()}/api/apps`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function triggerAppAction(
+  name: string,
+  action: 'start' | 'stop' | 'restart'
+): Promise<{ success: boolean; message?: string; error?: string; output?: string }> {
+  const res = await fetch(`${getApiBase()}/api/apps/${encodeURIComponent(name)}/action`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}

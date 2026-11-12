@@ -1,0 +1,283 @@
+[
+  {
+    "name": "postiz",
+    "title": "Postiz",
+    "description": "Open-source social media scheduling (Postgres + Redis + Temporal).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/Desktop/postiz",
+    "container": "postiz",
+    "url": "https://debian.tail46d59a.ts.net:4007/",
+    "icon": "\ud83d\udce8"
+  },
+  {
+    "name": "orca-remote",
+    "title": "Orca Remote Server",
+    "description": "Orca remote background server (mobile pairing on 6768).",
+    "kind": "systemd",
+    "unit": "orca-serve.service",
+    "container": "",
+    "url": "https://debian.tail46d59a.ts.net:6768/",
+    "icon": "\ud83d\udc0b"
+  },
+  {
+    "name": "omniroute",
+    "title": "OmniRoute",
+    "description": "LLM proxy server (port 20128).",
+    "kind": "systemd",
+    "unit": "omniroute.service",
+    "container": "",
+    "url": "https://debian.tail46d59a.ts.net:20128/",
+    "icon": "\ud83d\udd00"
+  },
+  {
+    "name": "pr-agent",
+    "title": "PR-Agent",
+    "description": "PR-Agent GitHub App and webhook service (port 8090).",
+    "kind": "systemd",
+    "unit": "pr-agent.service",
+    "container": "",
+    "url": "https://debian.tail46d59a.ts.net:8090/",
+    "icon": "\ud83e\udd16"
+  },
+  {
+    "name": "conduit",
+    "title": "Conduit (Matrix)",
+    "description": "Matrix homeserver (port 6167).",
+    "kind": "container",
+    "container": "conduit",
+    "url": "https://debian.tail46d59a.ts.net:6167/",
+    "icon": "\ud83d\udcac"
+  },
+  {
+    "name": "element-web",
+    "title": "Element Web",
+    "description": "Element web client for Matrix (port 6168).",
+    "kind": "systemd",
+    "unit": "element-web.service",
+    "url": "https://debian.tail46d59a.ts.net:6168/",
+    "icon": "\ud83c\udf10"
+  },
+  {
+    "name": "hermes-gateway",
+    "title": "Hermes Gateway",
+    "description": "Hermes agent gateway (messaging platforms).",
+    "kind": "systemd",
+    "unit": "hermes-gateway.service",
+    "url": "",
+    "icon": "\ud83e\uddd9"
+  },
+  {
+    "name": "hermes-dashboard",
+    "title": "Hermes Dashboard",
+    "description": "Hermes agent web UI (port 9119).",
+    "kind": "systemd",
+    "unit": "hermes-dashboard.service",
+    "url": "https://debian.tail46d59a.ts.net:9119/",
+    "icon": "\ud83e\uddd9"
+  },
+  {
+    "name": "secondbrain-sync",
+    "title": "SecondBrain Sync",
+    "description": "SecondBrain git auto-sync (pull/commit/push).",
+    "kind": "systemd",
+    "unit": "secondbrain-sync.service",
+    "url": "",
+    "icon": "\ud83e\udde0"
+  },
+  {
+    "name": "searxng",
+    "title": "SearXNG",
+    "description": "Privacy-respecting metasearch engine (SearXNG + Valkey).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/searxng",
+    "container": "searxng",
+    "url": "https://debian.tail46d59a.ts.net:8081/",
+    "icon": "\ud83d\udd0e"
+  },
+  {
+    "name": "perplexica",
+    "title": "Perplexica (Vane)",
+    "description": "AI-powered search/chat UI (Vane image).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/perplexica",
+    "container": "perplexica",
+    "url": "https://debian.tail46d59a.ts.net:3030/",
+    "icon": "\ud83e\udde0"
+  },
+  {
+    "name": "woodpecker",
+    "title": "Woodpecker CI",
+    "description": "Self-hosted CI/CD server + agent (GitHub forge, credentials needed).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/woodpecker",
+    "container": "woodpecker-server",
+    "url": "https://debian.tail46d59a.ts.net:8003/",
+    "icon": "\ud83e\udeb6"
+  },
+  {
+    "name": "reactive-resume",
+    "title": "Reactive Resume",
+    "description": "Resume builder (app + Postgres).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/reactive-resume",
+    "container": "reactive-resume",
+    "url": "https://debian.tail46d59a.ts.net:3020/",
+    "icon": "\ud83d\udcc4"
+  },
+  {
+    "name": "monica",
+    "title": "Monica",
+    "description": "Personal CRM (Monica v4 + MariaDB).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/monica",
+    "container": "monica",
+    "url": "https://debian.tail46d59a.ts.net:8086/",
+    "icon": "\ud83d\udc65"
+  },
+  {
+    "name": "hoppscotch",
+    "title": "Hoppscotch",
+    "description": "API development ecosystem (AIO + Postgres).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/hoppscotch",
+    "container": "hoppscotch",
+    "url": "https://debian.tail46d59a.ts.net:3006/",
+    "icon": "\ud83d\udef0\ufe0f"
+  },
+  {
+    "name": "excalidraw",
+    "title": "Excalidraw",
+    "description": "Virtual whiteboard/diagramming (static client).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/excalidraw",
+    "container": "excalidraw",
+    "url": "https://debian.tail46d59a.ts.net:3033/",
+    "icon": "\u270f\ufe0f"
+  },
+  {
+    "name": "pocketbase",
+    "title": "PocketBase",
+    "description": "Lightweight backend (SQLite, auth, realtime, files).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/pocketbase",
+    "container": "pocketbase",
+    "url": "https://debian.tail46d59a.ts.net:8096/",
+    "icon": "\ud83d\uddc4\ufe0f"
+  },
+  {
+    "name": "dockge",
+    "title": "Dockge",
+    "description": "Docker Compose stack manager (compose files on disk).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/dockge",
+    "container": "dockge",
+    "url": "https://debian.tail46d59a.ts.net:5001/",
+    "icon": "\ud83d\udc33"
+  },
+  {
+    "name": "freellmapi",
+    "title": "FreeLLMAPI",
+    "description": "Self-hosted LLM router aggregating free tiers of 18+ providers (OpenAI-compatible /v1).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/freellmapi",
+    "container": "freellmapi",
+    "url": "https://debian.tail46d59a.ts.net:3001/",
+    "icon": "\ud83d\udd00"
+  },
+  {
+    "name": "label-studio",
+    "title": "Label Studio",
+    "description": "Open-source data labeling platform (text, image, audio, video, NLP, CV).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/label-studio",
+    "container": "label-studio",
+    "url": "https://debian.tail46d59a.ts.net:8087/",
+    "icon": "\ud83c\udff7\ufe0f"
+  },
+  {
+    "name": "docmost",
+    "title": "Docmost",
+    "description": "Self-hosted wiki (AGPL-3.0, built-in auth, real-time collab, Mermaid/draw.io/LaTeX).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/docmost",
+    "container": "docmost",
+    "url": "https://sullivan-offline-enhanced-sequence.trycloudflare.com",
+    "icon": "\ud83d\udcda",
+    "public": true,
+    "tunnel_port": 3010
+  },
+  {
+    "name": "picoshare",
+    "title": "PicoShare",
+    "description": "Minimal file sharing service (upload files, get shareable links).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/picoshare",
+    "container": "picoshare",
+    "url": "https://pleasant-pump-thinks-harry.trycloudflare.com",
+    "icon": "\ud83d\udcce",
+    "public": true,
+    "tunnel_port": 8088
+  },
+  {
+    "name": "enclosed",
+    "title": "Enclosed",
+    "description": "Minimalistic E2E encrypted note/file sharing (zero-knowledge server).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/enclosed",
+    "container": "enclosed",
+    "url": "https://updates-totals-endorsed-hampton.trycloudflare.com",
+    "icon": "\ud83d\udd12",
+    "public": true,
+    "tunnel_port": 8787
+  },
+  {
+    "name": "chartdb",
+    "title": "ChartDB",
+    "description": "Visual database schema designer/ERD editor (runs in browser, no DB needed).",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/chartdb",
+    "container": "chartdb",
+    "url": "https://debian.tail46d59a.ts.net:8089/",
+    "icon": "\ud83d\udcca"
+  },
+  {
+    "name": "watchyourlan",
+    "title": "WatchYourLAN",
+    "description": "Lightweight network IP scanner with web GUI. Monitors hosts online/offline.",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/watchyourlan",
+    "container": "watchyourlan",
+    "url": "http://100.87.250.35:8842/",
+    "icon": "\ud83d\udce1"
+  },
+  {
+    "name": "freshrss",
+    "title": "FreshRSS",
+    "description": "Self-hosted RSS feed aggregator. Lightweight, powerful, customizable.",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/freshrss",
+    "container": "freshrss",
+    "url": "https://debian.tail46d59a.ts.net:8091/",
+    "icon": "\ud83d\udcf0"
+  },
+  {
+    "name": "romm",
+    "title": "RomM",
+    "description": "ROM manager with EmulatorJS for retro gaming in browser.",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/romm",
+    "container": "romm",
+    "url": "https://debian.tail46d59a.ts.net:6060/",
+    "icon": "\ud83c\udfae"
+  },
+  {
+    "name": "wallabag",
+    "title": "Wallabag",
+    "description": "Self-hosted read-it-later / save-for-later service.",
+    "kind": "docker",
+    "compose_dir": "/home/parth/projects/fleet/services/wallabag",
+    "container": "wallabag",
+    "url": "https://debian.tail46d59a.ts.net:8094/",
+    "icon": "\ud83d\udd16"
+  }
+]
