@@ -1,5 +1,29 @@
 # Iteration Log
 
+## 2026-11-13: Apps Page & Lifecycle Management for Curated Services
+
+### Status: Done
+
+### What Changed:
+1. **Curated Apps Backend (`apps.py`)**:
+   - Added REST router `/api/apps` to list configured self-hosted apps and inspect runtime container and systemd states.
+   - Added `/api/apps/{name}/action` endpoint supporting `start`, `stop`, and `restart` actions using `docker compose` or `systemctl --user`.
+   - Integrated Cloudflare quick tunnel lifecycle invocation via `manage-tunnel.sh` for public apps.
+2. **Registry Configuration (`data/curated_apps.json`)**:
+   - Registered 28 applications including the 8 new user-requested services (SearXNG, Perplexica, WoodpeckerCI, Reactive Resume, Monica, Hoppscotch, Excalidraw, PocketBase).
+   - Set up port bindings, canonical Tailscale HTTPS URLs, icons, and descriptions.
+3. **Frontend UI (`src/pages/apps.ts`)**:
+   - Created dedicated Apps view with responsive card grid, status indicators (running, stopped, not-found), and one-click start/stop actions.
+   - Added navigation item in desktop shell sidebar and mobile bottom nav.
+4. **Testing (`tests/test_apps.py`)**:
+   - Added unit test suite validating apps listing and action handling. All 97 pytest test cases passing.
+
+### Verification Results:
+- TypeScript compilation & Vite bundle build succeeded cleanly without errors.
+- Pytest suite: 97 passed.
+- Verified live API response on `http://127.0.0.1:8000/api/apps`.
+
+
 ## 2026-10-22: Antigravity — fix cross-window weekly/5h quota contamination
 
 ### Status: Done
