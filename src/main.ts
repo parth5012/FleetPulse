@@ -2,6 +2,9 @@ import './style.css';
 import './glanceboard.css';
 import { renderShell } from './shell';
 import { router } from './router';
+import { initTheme } from './lib/theme';
+
+initTheme();
 
 const root = document.getElementById('app')!;
 renderShell(root);
