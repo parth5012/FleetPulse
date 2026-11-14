@@ -1,8 +1,8 @@
 /**
- * Beszel-Style High-Fidelity System Telemetry Dashboard.
- * Replicates the exact visual language, 2x2 time-series area charts,
- * host metadata ribbon, sub-tabs (Core, Network, Disk, Containers),
- * and timeframe controls (1h, 6h, 24h, 7d).
+ * Beszel-Style High-Fidelity System Telemetry & Mesh Dashboard.
+ * 2x2 time-series area charts, host metadata ribbon, sub-tabs (Core, Disk, Network & Mesh, Containers),
+ * timeframe controls (1h, 6h, 24h, 7d), plus absorbed Tailscale mesh topology, serve routes,
+ * and open listening sockets inspection.
  */
 
 import {
@@ -10,6 +10,8 @@ import {
   fetchSystemHistory,
   fetchContainers,
   fetchSystemStats,
+  fetchTailscaleStatus,
+  fetchListeningPorts,
 } from '../lib/api';
 import { formatBytes, formatUptime, esc } from '../lib/format';
 import { renderBeszelChart, renderBarGauge } from '../lib/charts';
@@ -18,20 +20,29 @@ import type {
   SystemHistoryPoint,
   ContainerSummary,
   SystemStatsResponse,
+  TailscaleStatusResponse,
+  PortsResponse,
+  SocketPort,
+  TailscalePeer,
 } from '../lib/api';
 
 let pollTimer: number | null = null;
 
 export async function renderSystem(container: HTMLElement): Promise<void> {
-  let activeTab: 'core' | 'network' | 'disk' | 'containers' = 'core';
-  let currentTimeframeHours = 1; // Default to 1 hour matching screenshot
+  // Support deep-linking to subtabs, e.g. #/system?tab=network
+  const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+  const tabParam = urlParams.get('tab');
+  let activeTab: 'core' | 'network' | 'disk' | 'containers' =
+    tabParam === 'network' || tabParam === 'disk' || tabParam === 'containers' ? tabParam : 'core';
+
+  let currentTimeframeHours = 1;
   let isPaused = false;
 
   let currentSnapshot: SystemSnapshot | null = null;
   let currentHistory: SystemHistoryPoint[] = [];
 
   container.innerHTML = `
-    <!-- Beszel-Style Host Header & Summary Ribbon -->
+    <!-- Host Header & Summary Ribbon -->
     <div class="beszel-host-header" id="beszelHostHeader">
       <div class="beszel-host-title-row">
         <div class="beszel-host-left">
@@ -64,13 +75,13 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
 
     <!-- Beszel Sub-Navigation Tabs -->
     <div class="beszel-subnav" id="beszelSubnav">
-      <button class="beszel-tab active" data-tab="core">Core</button>
-      <button class="beszel-tab" data-tab="network">Network</button>
-      <button class="beszel-tab" data-tab="disk">Disk</button>
-      <button class="beszel-tab" data-tab="containers">Containers</button>
+      <button class="beszel-tab ${activeTab === 'core' ? 'active' : ''}" data-tab="core">Core Vitals</button>
+      <button class="beszel-tab ${activeTab === 'disk' ? 'active' : ''}" data-tab="disk">Disks & Partitions</button>
+      <button class="beszel-tab ${activeTab === 'network' ? 'active' : ''}" data-tab="network">Network & Tailscale</button>
+      <button class="beszel-tab ${activeTab === 'containers' ? 'active' : ''}" data-tab="containers">Container Telemetry</button>
     </div>
 
-    <!-- Active Tab Container (2x2 Chart Grid) -->
+    <!-- Active Tab Container -->
     <div id="beszelTabContent">
       <div class="loading-state" style="padding:40px;"><div class="spin">⚡</div></div>
     </div>
@@ -188,15 +199,15 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     const cpuChartHtml = renderBeszelChart(
       [
         {
-          name: 'CPU',
-          color: '#3b82f6', // Beszel blue
+          name: 'CPU Usage',
+          color: '#10b981',
           values: cpuValues,
           gradient: true,
         },
       ],
       {
         title: 'CPU Usage',
-        subtitle: 'Average system-wide CPU utilization',
+        subtitle: 'Average across all logical cores',
         unit: '%',
         timestamps,
       }
@@ -206,15 +217,17 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     const load1Values = hist.map((h) => h.load_1m || 0);
     const load5Values = hist.map((h) => h.load_5m || 0);
     const load15Values = hist.map((h) => h.load_15m || 0);
+
     const loadChartHtml = renderBeszelChart(
       [
-        { name: '1 min', color: '#a855f7', values: load1Values },
-        { name: '5 min', color: '#3b82f6', values: load5Values },
-        { name: '15 min', color: '#f97316', values: load15Values },
+        { name: '1m Load', color: '#10b981', values: load1Values },
+        { name: '5m Load', color: '#3b82f6', values: load5Values },
+        { name: '15m Load', color: '#a855f7', values: load15Values },
       ],
       {
-        title: 'Load Average',
-        subtitle: 'System load averages over time',
+        title: 'System Load Average',
+        subtitle: 'POSIX load running and uninterruptible tasks',
+        unit: '',
         legend: true,
         timestamps,
       }
@@ -223,14 +236,14 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     // 3. Memory Usage (in GB)
     const memGbValues = hist.map((h) => {
       const bytes = h.memory_used_bytes || (h.memory / 100) * (currentSnapshot?.memory.total_bytes || 6000000000);
-      return Math.round((bytes / (1024 ** 3)) * 100) / 100;
+      return Math.round((bytes / 1024 ** 3) * 100) / 100;
     });
 
     const memChartHtml = renderBeszelChart(
       [
         {
           name: 'Used RAM',
-          color: '#10b981', // Beszel emerald
+          color: '#10b981',
           values: memGbValues,
           gradient: true,
         },
@@ -248,14 +261,14 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
       const pct = h.swap || h.swap_used_percent || 0;
       const totalSwap = currentSnapshot?.memory.swap_total_bytes || 0;
       const bytes = (pct / 100) * totalSwap;
-      return Math.round((bytes / (1024 ** 3)) * 100) / 100;
+      return Math.round((bytes / 1024 ** 3) * 100) / 100;
     });
 
     const swapChartHtml = renderBeszelChart(
       [
         {
           name: 'Swap Used',
-          color: '#06b6d4', // Cyan
+          color: '#06b6d4',
           values: swapGbValues,
           gradient: true,
         },
@@ -278,14 +291,33 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
 
       <!-- CPU Per-Core Distribution Expander -->
       ${
-        currentSnapshot?.cpu.per_core && currentSnapshot.cpu.per_core.length > 0
+        currentSnapshot
           ? `
-        <details class="core-details" style="margin-top:16px;">
-          <summary>Show Per-Core Distribution (${currentSnapshot.cpu.core_count_logical} Logical Cores)</summary>
-          <div class="core-grid" style="margin-top:10px;">
-            ${currentSnapshot.cpu.per_core.map((p, idx) => renderBarGauge(p, `Core ${idx}`, `${p}%`)).join('')}
+        <div class="beszel-chart-card" style="margin-top:16px;">
+          <div class="beszel-chart-header">
+            <div>
+              <h3 class="beszel-chart-title">CPU Per-Core Distribution</h3>
+              <div class="beszel-chart-subtitle">Utilization across ${currentSnapshot.cpu.core_count_logical} logical cores</div>
+            </div>
           </div>
-        </details>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-top:12px;">
+            ${(currentSnapshot.cpu.per_core || [])
+              .map(
+                (pct: number, idx: number) => `
+              <div style="padding:10px; background:var(--gb-surface-2); border:1px solid var(--gb-border); border-radius:var(--gb-radius-sm);">
+                <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--gb-muted); margin-bottom:4px;">
+                  <span>Core ${idx}</span>
+                  <strong style="color:var(--gb-text);">${pct.toFixed(1)}%</strong>
+                </div>
+                <div class="bar-outer" style="height:6px;">
+                  <div class="bar-inner ${pct > 85 ? 'bar-low' : pct > 70 ? 'bar-med' : 'bar-ok'}" style="width:${pct}%;"></div>
+                </div>
+              </div>
+            `
+              )
+              .join('')}
+          </div>
+        </div>
       `
           : ''
       }
@@ -327,7 +359,6 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
               <h3 class="beszel-chart-title">Current Interface Rates</h3>
               <div class="beszel-chart-subtitle">Real-time socket and packet metrics</div>
             </div>
-            <button class="beszel-more-btn">•••</button>
           </div>
 
           <div style="padding:10px 0; display:flex; flex-direction:column; gap:12px;">
@@ -351,12 +382,272 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
             <div class="service-meta-list" style="margin-top:8px;">
               <div><span>Packets In:</span> <strong>${Math.round(netSnap?.packets_recv_per_sec || 0)} pkt/s</strong></div>
               <div><span>Packets Out:</span> <strong>${Math.round(netSnap?.packets_sent_per_sec || 0)} pkt/s</strong></div>
-              <div><span>Mesh State:</span> <strong style="color:#10b981;">Tailscale Active</strong></div>
+              <div><span>Mesh State:</span> <strong style="color:var(--gb-ok);">Tailscale Active</strong></div>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Absorbed Tailscale Mesh Topology -->
+      <div class="network-mesh-section" style="margin-top:24px;">
+        <div class="section-title" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <span>🔒 Tailscale Mesh Topology</span>
+          <span class="badge badge-info" id="meshPeerCountBadge">Querying mesh...</span>
+        </div>
+        <div class="mesh-cards-grid" id="meshCardsGrid">
+          <div class="loading-state" style="padding:24px;"><div class="spin">⚡</div></div>
+        </div>
+      </div>
+
+      <!-- Absorbed Tailscale Serve & Funnel Routes -->
+      <div class="serve-routes-section" style="margin-top:24px;">
+        <div class="section-title" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <span>🔀 Active Tailscale Serve & HTTPS Ingress Routes</span>
+          <span class="badge badge-info" id="serveCountBadge">0 Routes</span>
+        </div>
+        <div class="serve-routes-table-wrap" style="overflow-x:auto;">
+          <table class="data-table" id="serveTable">
+            <thead>
+              <tr>
+                <th>Ingress Port</th>
+                <th>Host / Domain</th>
+                <th>Path</th>
+                <th>Local Proxy Target</th>
+                <th>TLS Mode</th>
+              </tr>
+            </thead>
+            <tbody id="serveTableBody">
+              <tr><td colspan="5" class="muted" style="text-align:center;padding:16px;">Loading serve routes...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Absorbed Listening Ports & Open Sockets -->
+      <div class="sockets-section" style="margin-top:24px;">
+        <div class="sockets-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+          <div>
+            <div class="section-title">
+              <span>🔌 Open Listening Sockets (ss -tulpn)</span>
+              <span class="badge badge-info" id="portsCountBadge">0 Sockets</span>
+            </div>
+            <div class="muted" style="font-size:0.8rem;margin-top:2px;">
+              Audited network sockets bound to localhost, Tailscale, or public interfaces
+            </div>
+          </div>
+          <div class="sockets-controls" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <div class="timeframe-buttons" id="socketExposureFilters">
+              <button class="btn btn-sm btn-primary" data-filter="all">All</button>
+              <button class="btn btn-sm" data-filter="tailscale">Tailscale</button>
+              <button class="btn btn-sm" data-filter="public">Public</button>
+              <button class="btn btn-sm" data-filter="localhost">Localhost</button>
+            </div>
+            <input type="text" id="socketSearchInput" class="input-sm" placeholder="Filter port or process..." style="min-width:160px;" />
+          </div>
+        </div>
+
+        <div class="sockets-table-wrap" style="overflow-x:auto;">
+          <table class="data-table" id="socketsTable">
+            <thead>
+              <tr>
+                <th>Protocol</th>
+                <th>Port</th>
+                <th>Exposure</th>
+                <th>Local Address</th>
+                <th>Process</th>
+                <th>PID</th>
+                <th>State</th>
+              </tr>
+            </thead>
+            <tbody id="socketsTableBody">
+              <tr><td colspan="7" class="muted" style="text-align:center;padding:16px;">Auditing open sockets...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     `;
+
+    loadMeshAndSockets(target);
+  }
+
+  function getOsIcon(os: string): string {
+    const o = os.toLowerCase();
+    if (o.includes('linux') || o.includes('debian') || o.includes('ubuntu')) return '🐧';
+    if (o.includes('windows')) return '🪟';
+    if (o.includes('darwin') || o.includes('macos') || o.includes('ios')) return '🍎';
+    if (o.includes('android')) return '🤖';
+    return '💻';
+  }
+
+  async function loadMeshAndSockets(parent: HTMLElement): Promise<void> {
+    const grid = parent.querySelector('#meshCardsGrid') as HTMLElement;
+    const peerBadge = parent.querySelector('#meshPeerCountBadge') as HTMLElement;
+    const serveBadge = parent.querySelector('#serveCountBadge') as HTMLElement;
+    const serveTbody = parent.querySelector('#serveTableBody') as HTMLElement;
+    const socketsTbody = parent.querySelector('#socketsTableBody') as HTMLElement;
+    const socketsBadge = parent.querySelector('#portsCountBadge') as HTMLElement;
+    const searchInput = parent.querySelector('#socketSearchInput') as HTMLInputElement;
+    const filterBtns = parent.querySelectorAll('#socketExposureFilters button') as NodeListOf<HTMLButtonElement>;
+
+    let cachedPorts: SocketPort[] = [];
+    let currentExposure = 'all';
+    let searchQuery = '';
+
+    // Load Tailscale mesh
+    try {
+      const data: TailscaleStatusResponse = await fetchTailscaleStatus();
+      if (!data.installed || data.backend_state !== 'Running') {
+        if (grid) {
+          grid.innerHTML = `
+            <div class="empty-state" style="padding:20px;grid-column:1/-1;">
+              <p>⚠️ Tailscale daemon is not running or not logged in (${esc(data.backend_state)}).</p>
+            </div>
+          `;
+        }
+      } else {
+        if (peerBadge) peerBadge.textContent = `${data.peer_count} Peers Connected`;
+        const self = data.self_node;
+        const selfHtml = `
+          <div class="mesh-node-card self-card">
+            <div class="node-head">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="status-dot status-green"></span>
+                <strong>${esc(self.hostname)} (This Box)</strong>
+              </div>
+              <span class="badge badge-info">HOST NODE</span>
+            </div>
+            <div class="node-ip"><code>${esc(self.tailscale_ips[0] || '-')}</code></div>
+            <div class="node-meta">
+              <div><span class="lbl">DNS:</span> <code>${esc(self.dns_name)}</code></div>
+              <div><span class="lbl">OS:</span> ${getOsIcon(self.os)} ${esc(self.os)}</div>
+            </div>
+          </div>
+        `;
+
+        const peersHtml = data.peers.map((p: TailscalePeer) => {
+          const isOnline = p.online;
+          const connBadge = p.is_direct
+            ? '<span class="badge badge-success">DIRECT WireGuard</span>'
+            : `<span class="badge badge-warn">RELAY (${esc(p.relay || 'DERP')})</span>`;
+
+          return `
+            <div class="mesh-node-card ${isOnline ? '' : 'node-offline'}">
+              <div class="node-head">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span class="status-dot ${isOnline ? 'status-green' : 'status-gray'}"></span>
+                  <strong>${esc(p.hostname)}</strong>
+                </div>
+                ${connBadge}
+              </div>
+              <div class="node-ip"><code>${esc(p.tailscale_ips[0] || '-')}</code></div>
+              <div class="node-meta">
+                <div><span class="lbl">DNS:</span> <code>${esc(p.dns_name)}</code></div>
+                <div><span class="lbl">OS:</span> ${getOsIcon(p.os)} ${esc(p.os)}</div>
+                ${p.cur_addr ? `<div><span class="lbl">Endpoint:</span> <code>${esc(p.cur_addr)}</code></div>` : ''}
+                ${(p.rx_bytes || p.tx_bytes) ? `<div><span class="lbl">Traffic:</span> ↓ ${formatBytes(p.rx_bytes || 0)} · ↑ ${formatBytes(p.tx_bytes || 0)}</div>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        if (grid) grid.innerHTML = selfHtml + peersHtml;
+
+        if (serveBadge) serveBadge.textContent = `${data.serve_routes.length} Ingress Routes`;
+        if (serveTbody) {
+          if (data.serve_routes.length === 0) {
+            serveTbody.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center;padding:16px;">No Tailscale Serve or Funnel ingress routes configured.</td></tr>`;
+          } else {
+            serveTbody.innerHTML = data.serve_routes.map((r) => `
+              <tr>
+                <td><strong>:${r.port}</strong></td>
+                <td><code>${esc(r.host)}</code></td>
+                <td><code>${esc(r.path)}</code></td>
+                <td><span class="c-pill" style="color:var(--gb-ok);">${esc(r.proxy_target)}</span></td>
+                <td><span class="badge badge-info">TLS Terminated</span></td>
+              </tr>
+            `).join('');
+          }
+        }
+      }
+    } catch {
+      if (grid) grid.innerHTML = `<div class="empty-state" style="padding:20px;grid-column:1/-1;"><p>Error querying Tailscale status</p></div>`;
+    }
+
+    // Load Listening Ports
+    function renderSocketsTable(): void {
+      if (!socketsTbody) return;
+      const filtered = cachedPorts.filter((p) => {
+        if (currentExposure !== 'all' && p.exposure !== currentExposure) return false;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          return (
+            String(p.port).includes(q) ||
+            (p.process || '').toLowerCase().includes(q) ||
+            p.local_address.toLowerCase().includes(q)
+          );
+        }
+        return true;
+      });
+
+      if (socketsBadge) socketsBadge.textContent = `${filtered.length} Sockets`;
+
+      if (filtered.length === 0) {
+        socketsTbody.innerHTML = `<tr><td colspan="7" class="muted" style="text-align:center;padding:16px;">No listening sockets match filter.</td></tr>`;
+        return;
+      }
+
+      socketsTbody.innerHTML = filtered.map((s) => {
+        let expClass = 'badge-info';
+        let expText = 'Localhost';
+        if (s.exposure === 'tailscale') {
+          expClass = 'badge-success';
+          expText = 'Tailscale Mesh';
+        } else if (s.exposure === 'public') {
+          expClass = 'badge-warn';
+          expText = 'Public (0.0.0.0)';
+        }
+
+        return `
+          <tr>
+            <td><span class="badge-scope scope-user" style="font-weight:700;">${esc(s.protocol.toUpperCase())}</span></td>
+            <td><strong style="font-size:1.05rem;">${s.port}</strong></td>
+            <td><span class="badge ${expClass}">${expText}</span></td>
+            <td><code>${esc(s.local_address)}</code></td>
+            <td><strong style="color:var(--gb-ok);">${esc(s.process || 'system / root')}</strong></td>
+            <td><code>${s.pid ? s.pid : '-'}</code></td>
+            <td><span class="status-dot status-green"></span> ${esc(s.state || 'LISTEN')}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    try {
+      const pData: PortsResponse = await fetchListeningPorts();
+      cachedPorts = pData.ports || [];
+      renderSocketsTable();
+    } catch {
+      if (socketsTbody) socketsTbody.innerHTML = `<tr><td colspan="7" class="muted" style="text-align:center;padding:16px;">Failed to audit sockets.</td></tr>`;
+    }
+
+    // Wire socket search
+    searchInput?.addEventListener('input', (e) => {
+      searchQuery = (e.target as HTMLInputElement).value;
+      renderSocketsTable();
+    });
+
+    // Wire exposure filters
+    filterBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        filterBtns.forEach((b) => {
+          b.classList.remove('btn-primary');
+          b.classList.add('btn-secondary');
+        });
+        btn.classList.add('btn-primary');
+        btn.classList.remove('btn-secondary');
+        currentExposure = btn.dataset.filter || 'all';
+        renderSocketsTable();
+      });
+    });
   }
 
   function renderDiskTab(target: HTMLElement): void {
@@ -373,30 +664,29 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
       ],
       {
         title: 'Disk Throughput (I/O)',
-        subtitle: 'Read & write bandwidth bandwidth over time',
+        subtitle: 'Read & write bandwidth over time',
         unit: 'MB/s',
         legend: true,
         timestamps,
       }
     );
 
-    const partitions = currentSnapshot?.disk.partitions || [];
+    const parts = currentSnapshot?.disk.partitions || [];
 
     target.innerHTML = `
-      <div class="beszel-charts-grid">
+      <div class="beszel-charts-grid" style="grid-template-columns: 1fr;">
         ${ioChartHtml}
 
         <div class="beszel-chart-card">
           <div class="beszel-chart-header">
             <div>
-              <h3 class="beszel-chart-title">Partition Space</h3>
-              <div class="beszel-chart-subtitle">Mounted volumes and root filesystem</div>
+              <h3 class="beszel-chart-title">Disk Partitions & Mounts</h3>
+              <div class="beszel-chart-subtitle">Storage occupancy per block device</div>
             </div>
-            <button class="beszel-more-btn">•••</button>
           </div>
 
-          <div style="display:flex; flex-direction:column; gap:14px; padding-top:6px;">
-            ${partitions
+          <div style="padding:14px 0; display:flex; flex-direction:column; gap:16px;">
+            ${parts
               .map(
                 (p) => `
               <div>
@@ -432,11 +722,11 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
       }
 
       target.innerHTML = `
-        <div class="containers-mini-grid" style="grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px;">
+        <div class="containers-mini-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px;">
           ${list
             .map(
               (c: ContainerSummary) => `
-            <div class="container-pulse-card" style="padding:14px; background:#121215; border:1px solid rgba(255,255,255,0.08); border-radius:12px;">
+            <div class="container-pulse-card" style="padding:14px; background:var(--gb-surface-2); border:1px solid var(--gb-border); border-radius:var(--gb-radius);">
               <div class="card-head" style="display:flex; justify-content:space-between; align-items:center;">
                 <div style="display:flex; align-items:center; gap:8px;">
                   <span class="status-dot ${c.state === 'running' ? 'status-green' : 'status-gray'}"></span>
@@ -444,9 +734,9 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
                 </div>
                 <span class="badge ${c.state === 'running' ? 'badge-success' : 'badge-error'}">${esc(c.state.toUpperCase())}</span>
               </div>
-              <div class="c-image" style="font-size:0.75rem; color:#71717a; margin:6px 0;"><code>${esc(c.image)}</code></div>
+              <div class="c-image" style="font-size:0.75rem; color:var(--gb-muted); margin:6px 0;"><code>${esc(c.image)}</code></div>
               <div class="c-stats-row" style="display:flex; justify-content:space-between; font-size:0.8rem; margin-top:8px;">
-                <div><span class="lbl">CPU</span> <strong style="color:#10b981;">${c.cpu_percent}%</strong></div>
+                <div><span class="lbl">CPU</span> <strong style="color:var(--gb-ok);">${c.cpu_percent}%</strong></div>
                 <div><span class="lbl">MEM</span> <strong style="color:#a855f7;">${esc(c.mem_usage.split('/')[0] || c.mem_usage)}</strong></div>
                 <div><span class="lbl">PIDs</span> <strong>${c.pids}</strong></div>
               </div>
@@ -473,30 +763,30 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
 
   async function loadStats(hours: number): Promise<void> {
     try {
-      const stats = await fetchSystemStats(hours);
-      const avgRamEl = container.querySelector('#statAvgRam');
-      const ramRangeEl = container.querySelector('#statRamRange');
+      const stats: SystemStatsResponse = await fetchSystemStats(hours);
+
+      const avgRamEl = container.querySelector('#statAvgRam') as HTMLElement;
+      const ramRangeEl = container.querySelector('#statRamRange') as HTMLElement;
       const ramBarEl = container.querySelector('#statRamBar') as HTMLElement;
-      const avgLoadEl = container.querySelector('#statAvgLoad');
-      const loadRangeEl = container.querySelector('#statLoadRange');
+
+      const avgLoadEl = container.querySelector('#statAvgLoad') as HTMLElement;
+      const loadRangeEl = container.querySelector('#statLoadRange') as HTMLElement;
       const loadBarEl = container.querySelector('#statLoadBar') as HTMLElement;
-      const avgCpuEl = container.querySelector('#statAvgCpu');
-      const cpuPeakEl = container.querySelector('#statCpuPeak');
+
+      const avgCpuEl = container.querySelector('#statAvgCpu') as HTMLElement;
+      const cpuPeakEl = container.querySelector('#statCpuPeak') as HTMLElement;
       const cpuBarEl = container.querySelector('#statCpuBar') as HTMLElement;
-      const sampleEl = container.querySelector('#statSampleCount');
-      const badgeEl = container.querySelector('#sqliteSampleBadge');
+
+      const sampleEl = container.querySelector('#statSampleCount') as HTMLElement;
+      const badgeEl = container.querySelector('#sqliteSampleBadge') as HTMLElement;
 
       if (avgRamEl) avgRamEl.textContent = `${stats.memory.avg_percent.toFixed(1)}%`;
-      if (ramRangeEl) {
-        ramRangeEl.textContent = `Min: ${stats.memory.min_percent ?? 0}% · Peak: ${stats.memory.max_percent ?? 0}% (${formatBytes(stats.memory.avg_bytes ?? 0)})`;
-      }
+      if (ramRangeEl) ramRangeEl.textContent = `Min: ${(stats.memory.min_percent ?? 0).toFixed(0)}% · Peak: ${(stats.memory.max_percent ?? 0).toFixed(0)}%`;
       if (ramBarEl) ramBarEl.style.width = `${Math.min(100, stats.memory.avg_percent)}%`;
 
       if (avgLoadEl) avgLoadEl.textContent = stats.load.avg_1m.toFixed(2);
-      if (loadRangeEl) {
-        loadRangeEl.textContent = `5m: ${stats.load.avg_5m.toFixed(2)} · 15m: ${stats.load.avg_15m.toFixed(2)} · Peak 1m: ${stats.load.max_1m.toFixed(2)}`;
-      }
-      if (loadBarEl) loadBarEl.style.width = `${Math.min(100, (stats.load.avg_1m / 4) * 100)}%`;
+      if (loadRangeEl) loadRangeEl.textContent = `5m: ${stats.load.avg_5m.toFixed(2)} · 15m: ${stats.load.avg_15m.toFixed(2)} · Peak 1m: ${(stats.load.max_1m ?? 0).toFixed(2)}`;
+      if (loadBarEl) loadBarEl.style.width = `${Math.min(100, (stats.load.avg_1m / (currentSnapshot?.cpu.core_count_logical || 4)) * 100)}%`;
 
       if (avgCpuEl) avgCpuEl.textContent = `${stats.cpu.avg_percent.toFixed(1)}%`;
       if (cpuPeakEl) cpuPeakEl.textContent = `Peak: ${(stats.cpu.max_percent ?? 0).toFixed(1)}%`;
@@ -516,7 +806,6 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
       currentSnapshot = snap;
       updateHostBar(snap);
 
-      // Append latest point to history
       if (currentHistory.length > 0) {
         const last = currentHistory[currentHistory.length - 1];
         const nowIso = snap.timestamp;
@@ -554,6 +843,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
       tabBtns.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       activeTab = (btn.getAttribute('data-tab') as any) || 'core';
+      window.location.hash = `#/system?tab=${activeTab}`;
       renderActiveTab();
     });
   });

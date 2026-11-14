@@ -46,11 +46,23 @@ export function cleanupServices(): void {
   }
 }
 
-export async function renderServices(container: HTMLElement): Promise<void> {
+export async function renderServices(container: HTMLElement, isTab = false): Promise<void> {
   cleanupServices();
 
   container.innerHTML = `
     <div class="services-page">
+      ${
+        isTab
+          ? `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div>
+            <h2 style="font-size:1.15rem; font-weight:600; margin:0;">System & User Services</h2>
+            <p class="muted" style="font-size:0.82rem; margin:2px 0 0;">Inspect Linux background daemons with live memory allocation and CPU activity.</p>
+          </div>
+          <button id="servicesRefreshBtn" class="btn btn-secondary btn-sm" title="Manual refresh">🔄 Refresh</button>
+        </div>
+      `
+          : `
       <!-- Header -->
       <div class="page-header">
         <div class="header-titles">
@@ -64,6 +76,8 @@ export async function renderServices(container: HTMLElement): Promise<void> {
           </button>
         </div>
       </div>
+      `
+      }
 
       <!-- Services Vitals Ribbon -->
       <div class="vitals-ribbon" id="servicesVitals">

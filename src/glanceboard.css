@@ -1138,3 +1138,290 @@ body {
   border: 1px solid var(--gb-border);
   border-radius: 999px;
 }
+
+/* ---------------------------------------------------------------------------
+   Consolidated 5-Page IA: Tabs & Component Restyling
+--------------------------------------------------------------------------- */
+
+/* Sub-navigation tabs: horizontal scrolling on mobile, thumb-friendly targets */
+.beszel-subnav,
+.gb-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 4px;
+  background: var(--gb-surface);
+  border: 1px solid var(--gb-border);
+  border-radius: var(--gb-radius);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.beszel-subnav::-webkit-scrollbar,
+.gb-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.beszel-tab {
+  flex: 1 0 auto;
+  white-space: nowrap;
+}
+
+/* Curated Apps Grid & Cards */
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+.app-card {
+  background: var(--gb-surface);
+  border: 1px solid var(--gb-border);
+  border-radius: var(--gb-radius);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: none;
+}
+.app-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.app-icon {
+  font-size: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: var(--gb-surface-2);
+  border: 1px solid var(--gb-border);
+  border-radius: var(--gb-radius-sm);
+  flex-shrink: 0;
+}
+.app-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gb-text);
+}
+.app-card-meta {
+  font-size: 12px;
+  color: var(--gb-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.app-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--gb-border);
+}
+
+/* Tailscale Mesh & Sockets (Absorbed into System) */
+.mesh-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.mesh-node-card {
+  background: var(--gb-surface);
+  border: 1px solid var(--gb-border);
+  border-radius: var(--gb-radius);
+  padding: 16px;
+  box-shadow: none;
+}
+.mesh-node-card.self-card {
+  border-color: var(--gb-border-strong);
+  background: color-mix(in srgb, var(--gb-surface) 90%, var(--gb-ok-subtle));
+}
+.node-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.node-ip code {
+  font-family: var(--gb-font-num);
+  font-size: 13.5px;
+  color: var(--gb-ok);
+  background: var(--gb-surface-2);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.node-meta {
+  font-size: 12px;
+  color: var(--gb-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+/* Maintenance Cards (Absorbed into Ops) */
+.maintenance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+.maint-card {
+  background: var(--gb-surface);
+  border: 1px solid var(--gb-border);
+  border-radius: var(--gb-radius);
+  padding: 20px;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.maint-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.maint-icon {
+  font-size: 24px;
+}
+.maint-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--gb-text);
+}
+.maint-card-foot {
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+/* Kernel Pressure & PSI Tiles (Absorbed into Ops) */
+.kernel-watcher-card {
+  background: var(--gb-surface);
+  border: 1px solid var(--gb-border);
+  border-radius: var(--gb-radius);
+  padding: 18px;
+  box-shadow: none;
+  margin-bottom: 16px;
+}
+.kernel-pressure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.pressure-tile {
+  background: var(--gb-surface-2);
+  border: 1px solid var(--gb-border);
+  border-radius: var(--gb-radius-sm);
+  padding: 14px;
+}
+.tile-label {
+  font-size: 12px;
+  color: var(--gb-muted);
+  font-weight: 550;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tile-val {
+  font-family: var(--gb-font-num);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 4px 0 2px;
+  color: var(--gb-text);
+}
+.tile-sub {
+  font-size: 11px;
+  color: var(--gb-faint);
+}
+
+/* Quota Groups & Visual Buckets (Absorbed into Ops) */
+.quota-visual-ribbon {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.gauge-card {
+  background: var(--gb-surface);
+  border: 1px solid var(--gb-border);
+  border-radius: var(--gb-radius);
+  padding: 16px;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.quota-group-card {
+  background: var(--gb-surface);
+  border: 1px solid var(--gb-border);
+  border-radius: var(--gb-radius);
+  padding: 18px;
+  box-shadow: none;
+  margin-bottom: 16px;
+}
+.quota-buckets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.visual-bucket-card {
+  background: var(--gb-surface-2);
+  border: 1px solid var(--gb-border);
+  border-radius: var(--gb-radius-sm);
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Responsive Table Overflows for Mobile */
+.data-table-wrap,
+.serve-routes-table-wrap,
+.sockets-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--gb-radius);
+  border: 1px solid var(--gb-border);
+  background: var(--gb-surface);
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th {
+  background: var(--gb-surface-2);
+  color: var(--gb-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--gb-border);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--gb-border);
+  color: var(--gb-text);
+  white-space: nowrap;
+}
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+.data-table tr:hover td {
+  background: color-mix(in srgb, var(--gb-surface-2) 60%, transparent);
+}
+
