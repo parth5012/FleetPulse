@@ -1,556 +1,446 @@
 /**
- * Central Command Hub.
- * High-level telemetry cards for Tasks (btop), System Services,
- * Beszel vitals, Dozzel containers, and Antigravity quotas.
+ * Fleet overview — Daylight Console home page.
+ * Surfaces fleet health at a glance: host vitals strip, running/stopped
+ * service + container counts, live telemetry (polled), and quick links
+ * into every deeper page. Every async section has designed
+ * loading (skeleton), error (retry), and empty states.
  */
 
 import {
   fetchSystemMetrics,
   fetchSystemStats,
   fetchContainers,
-  fetchLimits,
   fetchTasks,
   fetchServices,
-  fetchTailscaleStatus,
-  fetchListeningPorts,
   fetchKernelHealth,
   fetchMaintenanceDf,
+  fetchTailscaleStatus,
+  fetchLimits,
+  type SystemSnapshot,
 } from '../lib/api';
 import { formatBytes, formatUptime, esc } from '../lib/format';
 import { renderDonutGauge } from '../lib/charts';
+import { icon, ROUTES } from '../shell';
+
+const POLL_MS = 5000;
+let pollTimer: number | null = null;
+
+function gaugeColor(pct: number): string {
+  if (pct >= 90) return '#dc2626';
+  if (pct >= 75) return '#d97706';
+  return '#059669';
+}
+
+function vitalShell(id: string): string {
+  return `
+    <div class="fleet-vital" id="${id}">
+      <div class="sk" style="width:64px; height:64px; border-radius:50%; flex-shrink:0;"></div>
+      <div class="fleet-vital-meta">
+        <div class="sk" style="width:55%;"></div>
+        <div class="sk" style="width:80%;"></div>
+      </div>
+    </div>`;
+}
+
+function vitalInner(label: string, donut: string, value: string, sub: string): string {
+  return `
+    <div class="vital-donut-wrap">${donut}</div>
+    <div class="fleet-vital-meta">
+      <span class="fleet-vital-label">${label}</span>
+      <span class="fleet-vital-value">${value}</span>
+      <span class="fleet-vital-sub">${sub}</span>
+    </div>`;
+}
+
+function skeletonRows(n: number): string {
+  let rows = '';
+  for (let i = 0; i < n; i++) {
+    rows += `<div class="sk-row"><div class="sk" style="width:38%; height:12px;"></div><div class="sk" style="width:18%; height:12px;"></div></div>`;
+  }
+  return rows;
+}
+
+function panelError(id: string, label: string): void {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = `
+    <div class="panel-state">
+      <div class="ps-icon">${icon('x', 18)}</div>
+      <div class="ps-text">Couldn't load ${esc(label)}</div>
+      <button class="ps-retry" data-retry="${id}">Retry</button>
+    </div>`;
+}
+
+function statTile(
+  href: string,
+  state: 'ok' | 'warn' | 'err' | 'neutral' | 'info',
+  iconName: string,
+  value: string,
+  label: string
+): string {
+  return `
+    <a class="stat-tile" href="#${href}">
+      <span class="st-icon ${state}">${icon(iconName, 18)}</span>
+      <span class="st-main">
+        <span class="st-value">${value}</span>
+        <span class="st-label">${label}</span>
+      </span>
+    </a>`;
+}
+
+function quickCard(r: (typeof ROUTES)[number]): string {
+  return `
+    <a class="quick-card" href="#${r.path}">
+      <span class="q-icon">${icon(r.icon, 18)}</span>
+      <span>
+        <div class="q-name">${r.name}</div>
+        <div class="q-desc">${r.desc}</div>
+      </span>
+    </a>`;
+}
+
+export function cleanupHome(): void {
+  if (pollTimer !== null) {
+    window.clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
 
 export async function renderHome(container: HTMLElement): Promise<void> {
+  cleanupHome();
+
   container.innerHTML = `
-    <div class="home-hero">
-      <div class="hero-badge">⚡ UNIFIED OBSERVABILITY PLATFORM</div>
-      <h1 class="hero-title">Visual Telemetry & Fleet Hub</h1>
-      <p class="hero-desc">
-        Integrated infrastructure telemetry inspired by <strong>btop</strong> (process monitoring),
-        <strong>systemd</strong> (daemon health), <strong>Beszel</strong> (server vitals),
-        and <strong>Dozzel</strong> (container fleet logs).
-      </p>
+    <div class="page-header">
+      <div class="header-titles">
+        <div class="page-crumb"><a href="#/">FleetPulse</a> <span class="crumb-sep">/</span> Overview</div>
+        <h1 class="page-title">Fleet overview</h1>
+        <p class="page-subtitle">Host vitals, services and containers at a glance. Live telemetry refreshes every few seconds.</p>
+      </div>
+      <div class="header-actions">
+        <span class="updated-note" id="homeUpdated"></span>
+      </div>
     </div>
 
-    <!-- Quick Services Grid -->
-    <div class="services-grid">
-      <!-- Card 1: Tasks / btop Process Monitor -->
-      <div class="service-card" id="homeTasksCard">
-        <div class="service-head">
-          <div class="service-icon icon-tasks">⚡</div>
-          <div>
-            <h3>Tasks & Processes (btop)</h3>
-            <p class="muted">Live CPU, RAM sorted processes & task manager</p>
-          </div>
-          <span class="pill pill-live" id="homeTasksPill">Polling...</span>
-        </div>
-        <div class="service-body">
-          <div class="home-tasks-preview" id="homeTasksPreview">
-            <div class="loading-state" style="padding: 12px;"><div class="spin">⚡</div></div>
-          </div>
-        </div>
-        <div class="service-foot">
-          <a href="#/tasks" class="btn btn-primary" style="width:100%;justify-content:center;">Open Task Manager →</a>
-        </div>
-      </div>
+    <!-- Host identity + live status -->
+    <div class="host-card" id="homeHostCard">
+      <div class="sk" style="width:120px; height:14px;"></div>
+      <div class="sk" style="width:180px; height:14px;"></div>
+      <div class="sk" style="width:100px; height:14px;"></div>
+    </div>
 
-      <!-- Card 2: System Services (systemd) -->
-      <div class="service-card" id="homeSvcsCard">
-        <div class="service-head">
-          <div class="service-icon icon-svcs">⚙️</div>
-          <div>
-            <h3>System Services</h3>
-            <p class="muted">User & system daemons with RAM footprint</p>
-          </div>
-          <span class="pill pill-live" id="homeSvcsPill">Polling...</span>
-        </div>
-        <div class="service-body">
-          <div class="home-svcs-preview" id="homeSvcsPreview">
-            <div class="loading-state" style="padding: 12px;"><div class="spin">⚡</div></div>
-          </div>
-        </div>
-        <div class="service-foot">
-          <a href="#/services" class="btn btn-primary" style="width:100%;justify-content:center;">Inspect Services →</a>
-        </div>
-      </div>
+    <!-- Vitals strip -->
+    <div class="fleet-strip" style="margin-top:12px;" id="homeVitals">
+      ${vitalShell('homeVitalCpu')}
+      ${vitalShell('homeVitalRam')}
+      ${vitalShell('homeVitalDisk')}
+      ${vitalShell('homeVitalNet')}
+    </div>
 
-      <!-- Card 3: Beszel System Monitor -->
-      <div class="service-card" id="homeSysCard">
-        <div class="service-head">
-          <div class="service-icon icon-sys">🖥️</div>
-          <div>
-            <h3>System Monitor (Beszel)</h3>
-            <p class="muted">Live CPU, RAM, Disk I/O & Network vitals</p>
-          </div>
-          <span class="pill pill-live" id="homeSysPill">Polling...</span>
-        </div>
-        <div class="service-body">
-          <div class="home-metric-row">
-            <div id="homeCpuGauge"></div>
-            <div id="homeMemGauge"></div>
-            <div id="homeDiskGauge"></div>
-          </div>
-          <div class="service-meta-list" id="homeSysMeta">
-            <div><span>Host:</span> <strong id="hMetaHost">-</strong></div>
-            <div><span>Uptime:</span> <strong id="hMetaUptime">-</strong></div>
-            <div><span>Live Load:</span> <strong id="hMetaLoad">-</strong></div>
-            <div><span>Avg RAM (24h):</span> <strong id="hMetaAvgMem" style="color:#a855f7;">-</strong></div>
-            <div><span>Avg Load (24h):</span> <strong id="hMetaAvgLoad" style="color:#10b981;">-</strong></div>
-          </div>
-        </div>
-        <div class="service-foot">
-          <a href="#/system" class="btn btn-primary" style="width:100%;justify-content:center;">Open System Monitor →</a>
-        </div>
-      </div>
+    <!-- Status summary tiles -->
+    <div class="stat-row" id="homeStats">
+      ${statTile('/services', 'neutral', 'cpu', '…', 'Services')}
+      ${statTile('/containers', 'neutral', 'box', '…', 'Containers')}
+      ${statTile('/journal', 'neutral', 'file', '…', 'Journal')}
+      ${statTile('/antigravity', 'neutral', 'chart', '…', 'Quota headroom')}
+    </div>
 
-      <!-- Card 4: Dozzel Container & Logs -->
-      <div class="service-card" id="homeDockCard">
-        <div class="service-head">
-          <div class="service-icon icon-dock">🐳</div>
-          <div>
-            <h3>Containers & Logs (Dozzel)</h3>
-            <p class="muted">Real-time log tailing, ANSI colors & fleet stats</p>
-          </div>
-          <span class="pill pill-live" id="homeDockPill">Polling...</span>
+    <!-- Live panels -->
+    <div class="panel-grid">
+      <div class="panel-card">
+        <div class="panel-head">
+          <span class="ph-title">${icon('zap', 15)} Top processes</span>
+          <a class="ph-link" href="#/tasks">Task manager →</a>
         </div>
-        <div class="service-body">
-          <div class="home-containers-preview" id="homeContainersPreview">
-            <div class="empty-state" style="padding:16px 8px;"><p>Loading containers...</p></div>
-          </div>
-        </div>
-        <div class="service-foot">
-          <a href="#/containers" class="btn btn-primary" style="width:100%;justify-content:center;">Open Log Console →</a>
-        </div>
+        <div class="panel-body" id="homeProcs">${skeletonRows(4)}</div>
       </div>
+      <div class="panel-card">
+        <div class="panel-head">
+          <span class="ph-title">${icon('cpu', 15)} Heaviest services</span>
+          <a class="ph-link" href="#/services">All services →</a>
+        </div>
+        <div class="panel-body" id="homeSvcs">${skeletonRows(4)}</div>
+      </div>
+    </div>
 
-      <!-- Card 5: Antigravity Quota Hub -->
-      <div class="service-card" id="homeAgyCard">
-        <div class="service-head">
-          <div class="service-icon icon-agy">🔮</div>
-          <div>
-            <h3>Antigravity Quotas</h3>
-            <p class="muted">5h + weekly LLM quota pools across accounts</p>
-          </div>
-          <span class="pill" id="homeAgyPill">Ready</span>
-        </div>
-        <div class="service-body">
-          <div class="home-agy-preview" id="homeAgyPreview">
-            <div class="empty-state" style="padding:16px 8px;"><p>Connecting to OmniRoute...</p></div>
-          </div>
-        </div>
-        <div class="service-foot">
-          <a href="#/antigravity" class="btn btn-primary" style="width:100%;justify-content:center;">Open Quota Dashboard →</a>
-        </div>
-      </div>
-
-      <!-- Card 6: Tailscale & Network Health -->
-      <div class="service-card" id="homeNetCard">
-        <div class="service-head">
-          <div class="service-icon icon-tasks">🌐</div>
-          <div>
-            <h3>Network & Tailscale Inspector</h3>
-            <p class="muted">Live mesh topology, WireGuard vs DERP & open sockets</p>
-          </div>
-          <span class="pill pill-live" id="homeNetPill">Auditing...</span>
-        </div>
-        <div class="service-body">
-          <div id="homeNetPreview">
-            <div class="loading-state" style="padding: 12px;"><div class="spin">⚡</div></div>
-          </div>
-        </div>
-        <div class="service-foot">
-          <a href="#/network" class="btn btn-primary" style="width:100%;justify-content:center;">Inspect Network →</a>
-        </div>
-      </div>
-
-      <!-- Card 7: System Journal & Kernel Watcher -->
-      <div class="service-card" id="homeJournalCard">
-        <div class="service-head">
-          <div class="service-icon icon-svcs">📜</div>
-          <div>
-            <h3>System Journal & Kernel Watcher</h3>
-            <p class="muted">OOM killer events, Linux PSI stalls & systemd logs</p>
-          </div>
-          <span class="pill pill-live" id="homeJournalPill">Watching...</span>
-        </div>
-        <div class="service-body">
-          <div id="homeJournalPreview">
-            <div class="loading-state" style="padding: 12px;"><div class="spin">⚡</div></div>
-          </div>
-        </div>
-        <div class="service-foot">
-          <a href="#/journal" class="btn btn-primary" style="width:100%;justify-content:center;">View Host Logs →</a>
-        </div>
-      </div>
-
-      <!-- Card 8: One-Tap Maintenance Hub -->
-      <div class="service-card" id="homeMaintCard">
-        <div class="service-head">
-          <div class="service-icon icon-dock">🛠️</div>
-          <div>
-            <h3>Remote Maintenance & Actions</h3>
-            <p class="muted">Docker prune, journal vacuum & daemon restart shortcuts</p>
-          </div>
-          <span class="pill" id="homeMaintPill">Console</span>
-        </div>
-        <div class="service-body">
-          <div id="homeMaintPreview">
-            <div class="loading-state" style="padding: 12px;"><div class="spin">⚡</div></div>
-          </div>
-        </div>
-        <div class="service-foot">
-          <a href="#/maintenance" class="btn btn-primary" style="width:100%;justify-content:center;">Admin Console →</a>
-        </div>
-      </div>
+    <!-- Quick links -->
+    <div class="page-crumb" style="margin-bottom:8px;">Quick links</div>
+    <div class="quick-grid">
+      ${ROUTES.filter((r) => r.path !== '/').map(quickCard).join('')}
     </div>
   `;
 
-  // 1. Fetch Tasks Preview
-  try {
-    const taskRes = await fetchTasks('cpu', 'desc', 4);
-    const pill = container.querySelector('#homeTasksPill') as HTMLElement;
-    if (pill) {
-      pill.textContent = `${taskRes.overview.total_processes} Procs (${taskRes.overview.cpu_total_percent.toFixed(0)}% CPU)`;
-    }
-    const preview = container.querySelector('#homeTasksPreview') as HTMLElement;
-    if (preview) {
-      const cpuDonut = renderDonutGauge(taskRes.overview.cpu_total_percent, {
-        size: 58,
-        strokeWidth: 5,
-        label: 'CPU',
-        color: taskRes.overview.cpu_total_percent > 75 ? '#ef4444' : '#10b981',
-      });
-      const ramDonut = renderDonutGauge(taskRes.overview.memory_used_percent, {
-        size: 58,
-        strokeWidth: 5,
-        label: 'RAM',
-        color: '#a855f7',
-      });
+  container.querySelectorAll<HTMLButtonElement>('[data-retry]').forEach((btn) => {
+    btn.addEventListener('click', () => void loadHome(container));
+  });
 
-      preview.innerHTML = `
-        <div style="display:flex; justify-content:space-around; align-items:center; margin-bottom:12px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
-          ${cpuDonut}
-          ${ramDonut}
-        </div>
-        ${taskRes.tasks
-          .map(
-            (t) => `
-          <div class="home-c-row">
-            <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
-              <code style="font-size:0.75rem;color:var(--text-muted);">${t.pid}</code>
-              <strong style="font-size:0.85rem;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${esc(t.name)}</strong>
-            </div>
-            <div style="display:flex;gap:6px;flex-shrink:0;">
-              <span class="c-pill" style="color:var(--primary)">${t.cpu_percent.toFixed(1)}%</span>
-              <span class="c-pill">${esc(t.memory_formatted)}</span>
-            </div>
-          </div>
-        `
-          )
-          .join('')}
-      `;
-    }
-  } catch (err) {
-    console.warn('Home tasks fetch error', err);
-  }
+  await loadHome(container);
+  pollTimer = window.setInterval(() => void refreshVitals(container), POLL_MS);
+}
 
-  // 2. Fetch Services Preview
-  try {
-    const svcsRes = await fetchServices('all', 'all', 'ram', 'desc', 4);
-    const pill = container.querySelector('#homeSvcsPill') as HTMLElement;
-    if (pill) {
-      pill.textContent = `${svcsRes.overview.running_services} Active (${svcsRes.overview.total_memory_formatted})`;
-    }
-    const preview = container.querySelector('#homeSvcsPreview') as HTMLElement;
-    if (preview) {
-      preview.innerHTML = svcsRes.services.map((s) => `
-        <div class="home-c-row">
-          <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
-            <span class="badge-scope scope-${s.scope}" style="font-size:0.65rem;padding:1px 4px;">${s.scope}</span>
-            <strong style="font-size:0.85rem;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${esc(s.name)}</strong>
-          </div>
-          <div style="display:flex;gap:6px;flex-shrink:0;">
-            <span class="c-pill">${esc(s.memory_formatted)}</span>
-          </div>
-        </div>
-      `).join('');
-    }
-  } catch (err) {
-    console.warn('Home services fetch error', err);
-  }
-
-  // 3. Fetch System Vitals
-  try {
-    const sys = await fetchSystemMetrics();
-    const sysPill = container.querySelector('#homeSysPill') as HTMLElement;
-    if (sysPill) {
-      sysPill.textContent = 'ONLINE';
-      sysPill.className = 'pill pill-live';
-    }
-
-    const cpuG = container.querySelector('#homeCpuGauge') as HTMLElement;
-    if (cpuG) {
-      cpuG.innerHTML = renderDonutGauge(sys.cpu.total_percent, { size: 76, strokeWidth: 7, label: 'CPU' });
-    }
-    const memG = container.querySelector('#homeMemGauge') as HTMLElement;
-    if (memG) {
-      memG.innerHTML = renderDonutGauge(sys.memory.used_percent, { size: 76, strokeWidth: 7, label: 'RAM', color: '#a855f7' });
-    }
-    const diskG = container.querySelector('#homeDiskGauge') as HTMLElement;
-    if (diskG) {
-      diskG.innerHTML = renderDonutGauge(sys.disk.used_percent, { size: 76, strokeWidth: 7, label: 'DISK', color: '#10b981' });
-    }
-
-    const hostEl = container.querySelector('#hMetaHost') as HTMLElement;
-    if (hostEl) hostEl.textContent = sys.host.hostname || 'localhost';
-    const upEl = container.querySelector('#hMetaUptime') as HTMLElement;
-    if (upEl) upEl.textContent = formatUptime(sys.host.uptime_seconds);
-    const loadEl = container.querySelector('#hMetaLoad') as HTMLElement;
-    if (loadEl) loadEl.textContent = (sys.load_avg || []).join(' · ') || '0.0';
-
-    // Fetch rolling 24h SQLite stats for Avg RAM and Avg Load
-    try {
-      const stats = await fetchSystemStats(24);
-      const avgMemEl = container.querySelector('#hMetaAvgMem') as HTMLElement;
-      if (avgMemEl) {
-        avgMemEl.textContent = `${stats.memory.avg_percent.toFixed(1)}%`;
-      }
-      const avgLoadEl = container.querySelector('#hMetaAvgLoad') as HTMLElement;
-      if (avgLoadEl) {
-        avgLoadEl.textContent = `${stats.load.avg_1m.toFixed(2)} (1m)`;
-      }
-    } catch {
-      // optional
-    }
-  } catch (err) {
-    console.warn('Home sys fetch error', err);
-  }
-
-  // 4. Fetch containers preview
-  try {
-    const data = await fetchContainers();
-    const list = data.containers || [];
-    const dockPill = container.querySelector('#homeDockPill') as HTMLElement;
-    if (dockPill) {
-      dockPill.textContent = `${list.length} Containers`;
-      dockPill.className = 'pill pill-live';
-    }
-
-    const preview = container.querySelector('#homeContainersPreview') as HTMLElement;
-    if (preview) {
-      preview.innerHTML = list
-        .slice(0, 4)
-        .map(
-          (c) => `
-        <div class="home-c-row">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="status-dot ${c.state === 'running' ? 'status-green' : 'status-gray'}"></span>
-            <strong style="font-size:0.85rem;">${esc(c.name)}</strong>
-          </div>
-          <div style="display:flex;gap:6px;">
-            <span class="c-pill">CPU ${c.cpu_percent}%</span>
-            <span class="c-pill">RAM ${esc(c.mem_usage.split('/')[0] || c.mem_usage)}</span>
-          </div>
-        </div>
-      `
-        )
-        .join('');
-    }
-  } catch (err) {
-    console.warn('Home dock fetch error', err);
-  }
-
-  // 5. Fetch Antigravity preview
-  try {
-    const data = await fetchLimits(false);
-    const accs = data.accounts || [];
-    const agyPill = container.querySelector('#homeAgyPill') as HTMLElement;
-    if (agyPill) {
-      agyPill.textContent = `${accs.length} Accounts`;
-      agyPill.className = 'pill pill-live';
-    }
-    const agyPreview = container.querySelector('#homeAgyPreview') as HTMLElement;
-    if (agyPreview) {
-      if (accs.length === 0) {
-        agyPreview.innerHTML = '<div class="empty-state" style="padding:16px 8px;"><p>No Antigravity accounts configured</p></div>';
-      } else {
-        let totalFrac = 0;
-        let count = 0;
-        accs.forEach((a) => {
-          (a.groups || []).forEach((g) => {
-            (g.buckets || []).forEach((b) => {
-              totalFrac += Number(b.remainingFraction || 0);
-              count++;
-            });
-          });
-          if ((a.groups || []).length === 0) {
-            (a.families || []).forEach((f) => {
-              totalFrac += Number(f.remaining || 0);
-              count++;
-            });
-          }
-        });
-        const headroomPct = count > 0 ? Math.round((totalFrac / count) * 100) : 100;
-
-        const donutHtml = renderDonutGauge(headroomPct, {
-          size: 68,
-          strokeWidth: 6,
-          label: 'HEADROOM',
-          color: headroomPct > 50 ? '#10b981' : headroomPct > 20 ? '#f59e0b' : '#ef4444',
-        });
-
-        agyPreview.innerHTML = `
-          <div style="display:flex; align-items:center; gap:16px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.05);">
-            <div style="flex-shrink:0;">${donutHtml}</div>
-            <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
-              <strong style="font-size:0.9rem; color:var(--text);">${accs.length} OmniRoute Accounts</strong>
-              <span style="font-size:0.75rem; color:var(--text-muted);">${count} Active Quota Pools</span>
-              <span class="status-chip status-running" style="align-self:flex-start; margin-top:2px; font-size:0.65rem;">QUOTA READY</span>
-            </div>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            ${accs
-              .slice(0, 2)
-              .map(
-                (a) => `
-              <div class="home-c-row">
-                <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
-                  <span class="status-dot status-green"></span>
-                  <strong style="font-size:0.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.account_id)}</strong>
-                </div>
-                <span class="c-pill" style="flex-shrink:0;">${(a.groups || []).length || (a.families || []).length} pools</span>
-              </div>
-            `
-              )
-              .join('')}
-          </div>
-        `;
-      }
-    }
-  } catch (err) {
-    console.warn('Home agy fetch error', err);
-  }
-
-  // 6. Fetch Network Preview
-  try {
-    const [tailData, portsData] = await Promise.allSettled([
+async function loadHome(container: HTMLElement): Promise<void> {
+  const [sysRes, tasksRes, svcsRes, ctrRes, kernelRes, maintRes, tailRes, agyRes, statsRes] =
+    await Promise.allSettled([
+      fetchSystemMetrics(),
+      fetchTasks('cpu', 'desc', 5),
+      fetchServices('all', 'all', 'ram', 'desc', 5),
+      fetchContainers(),
+      fetchKernelHealth(),
+      fetchMaintenanceDf(),
       fetchTailscaleStatus(),
-      fetchListeningPorts(),
+      fetchLimits(false),
+      fetchSystemStats(24),
     ]);
 
-    const netPill = container.querySelector('#homeNetPill') as HTMLElement;
-    const netPreview = container.querySelector('#homeNetPreview') as HTMLElement;
-
-    if (netPreview) {
-      const isTailOk = tailData.status === 'fulfilled' && tailData.value.installed && tailData.value.backend_state === 'Running';
-      const peerCount = isTailOk ? tailData.value.peer_count : 0;
-      const portCount = portsData.status === 'fulfilled' ? portsData.value.count : 0;
-      const directCount = isTailOk ? tailData.value.peers.filter((p) => p.is_direct).length : 0;
-
-      if (netPill) {
-        netPill.textContent = `${peerCount} Peers · ${portCount} Sockets`;
-      }
-
-      netPreview.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          <div class="home-c-row">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="status-dot ${isTailOk ? 'status-green' : 'status-gray'}"></span>
-              <strong>Tailscale WireGuard Mesh</strong>
-            </div>
-            <span class="badge ${isTailOk ? 'badge-success' : 'badge-error'}">${isTailOk ? `${directCount} Direct / ${peerCount} Peers` : 'Inactive'}</span>
-          </div>
-          <div class="home-c-row">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="status-dot status-green"></span>
-              <strong>Open Listening Sockets</strong>
-            </div>
-            <span class="badge badge-info">${portCount} Ports Audited</span>
-          </div>
-        </div>
+  // --- Host card ---
+  const hostCard = container.querySelector('#homeHostCard') as HTMLElement | null;
+  if (hostCard) {
+    if (sysRes.status === 'fulfilled') {
+      const sys = sysRes.value;
+      const load = (sys.load_avg || []).map((l) => l.toFixed(2)).join(' · ');
+      hostCard.innerHTML = `
+        <span class="hc-status"><span class="status-dot status-green"></span> Up ${formatUptime(sys.host.uptime_seconds)}</span>
+        <div class="hc-item"><span class="hc-label">Host</span><span class="hc-value">${esc(sys.host.hostname || 'localhost')}</span></div>
+        <div class="hc-item"><span class="hc-label">Platform</span><span class="hc-value">${esc(sys.host.distro || sys.host.os_release || sys.host.platform || '—')}</span></div>
+        <div class="hc-item"><span class="hc-label">Load avg</span><span class="hc-value">${esc(load) || '—'}</span></div>
+        ${statsRes.status === 'fulfilled' ? `<div class="hc-item"><span class="hc-label">24h avg mem</span><span class="hc-value">${statsRes.value.memory.avg_percent.toFixed(1)}%</span></div>` : ''}
+        <div class="panel-meta" id="homeUpdated2"></div>
       `;
+    } else {
+      hostCard.innerHTML = `
+        <div class="panel-state" style="width:100%;">
+          <div class="ps-text">Couldn't reach host telemetry</div>
+          <button class="ps-retry" data-retry="homeHostCard">Retry</button>
+        </div>`;
     }
-  } catch (err) {
-    console.warn('Home net fetch error', err);
   }
 
-  // 7. Fetch Journal & Kernel Preview
+  // --- Vitals ---
+  if (sysRes.status === 'fulfilled') {
+    paintVitals(sysRes.value);
+  } else {
+    ['homeVitalCpu', 'homeVitalRam', 'homeVitalDisk', 'homeVitalNet'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el)
+        el.innerHTML = `<div class="panel-state" style="width:100%; padding:8px 0;"><div class="ps-text">No telemetry</div></div>`;
+    });
+  }
+
+  // --- Status tiles ---
+  const stats = container.querySelector('#homeStats') as HTMLElement | null;
+  if (stats) {
+    let html = '';
+    if (svcsRes.status === 'fulfilled') {
+      const ov = svcsRes.value.overview;
+      const failed = ov.failed_services ?? 0;
+      const st = failed > 0 ? 'err' : 'ok';
+      html += statTile(
+        '/services',
+        st,
+        'cpu',
+        `${ov.running_services}<span style="color:var(--text-muted);">/${ov.total_services}</span>`,
+        failed > 0 ? `running · ${failed} failed` : 'running'
+      );
+    } else {
+      html += statTile('/services', 'neutral', 'cpu', '—', 'Services unavailable');
+    }
+
+    if (ctrRes.status === 'fulfilled') {
+      const list = ctrRes.value.containers || [];
+      const running = list.filter((c) => c.state === 'running').length;
+      const stopped = list.length - running;
+      html += statTile(
+        '/containers',
+        stopped > 0 ? 'warn' : 'ok',
+        'box',
+        `${running}<span style="color:var(--text-muted);">/${list.length}</span>`,
+        stopped > 0 ? `running · ${stopped} stopped` : 'all running'
+      );
+    } else {
+      html += statTile('/containers', 'neutral', 'box', '—', 'Containers unavailable');
+    }
+
+    if (kernelRes.status === 'fulfilled') {
+      const oom = kernelRes.value.oom_kill_count || 0;
+      html += statTile(
+        '/journal',
+        oom > 0 ? 'err' : 'ok',
+        'file',
+        oom > 0 ? `${oom}` : 'Clear',
+        oom > 0 ? 'OOM kills — investigate' : 'No kernel alerts'
+      );
+    } else {
+      html += statTile('/journal', 'neutral', 'file', '—', 'Journal unavailable');
+    }
+
+    if (agyRes.status === 'fulfilled') {
+      const accs = agyRes.value.accounts || [];
+      let frac = 0;
+      let count = 0;
+      accs.forEach((a) => {
+        (a.groups || []).forEach((g) => {
+          (g.buckets || []).forEach((b) => {
+            frac += Number(b.remainingFraction || 0);
+            count++;
+          });
+        });
+        if ((a.groups || []).length === 0) {
+          (a.families || []).forEach((f) => {
+            frac += Number(f.remaining || 0);
+            count++;
+          });
+        }
+      });
+      const headroom = count > 0 ? Math.round((frac / count) * 100) : 100;
+      html += statTile(
+        '/antigravity',
+        headroom > 50 ? 'ok' : headroom > 20 ? 'warn' : 'err',
+        'chart',
+        `${headroom}%`,
+        accs.length ? `${accs.length} accounts · headroom` : 'No accounts'
+      );
+    } else {
+      html += statTile('/antigravity', 'neutral', 'chart', '—', 'Quotas unavailable');
+    }
+
+    if (maintRes.status === 'fulfilled') {
+      const disk = maintRes.value.disk_root;
+      const st = disk.used_percent >= 90 ? 'err' : disk.used_percent >= 80 ? 'warn' : 'ok';
+      html += statTile(
+        '/maintenance',
+        st,
+        'wrench',
+        `${disk.used_percent}%`,
+        `${formatBytes(disk.free_bytes)} free on /`
+      );
+    } else {
+      html += statTile('/maintenance', 'neutral', 'wrench', '—', 'Disk stats unavailable');
+    }
+
+    if (tailRes.status === 'fulfilled' && tailRes.value.installed && tailRes.value.backend_state === 'Running') {
+      const direct = tailRes.value.peers.filter((p) => p.is_direct).length;
+      html += statTile(
+        '/network',
+        'info',
+        'globe',
+        `${tailRes.value.peer_count}`,
+        `peers · ${direct} direct connections`
+      );
+    } else {
+      html += statTile('/network', 'neutral', 'globe', '—', 'Tailscale not running');
+    }
+
+    stats.innerHTML = html;
+  }
+
+  // --- Top processes panel ---
+  const procs = container.querySelector('#homeProcs') as HTMLElement | null;
+  if (procs) {
+    if (tasksRes.status === 'fulfilled') {
+      const ov = tasksRes.value.overview;
+      procs.innerHTML = `
+        <div class="panel-row" style="border-bottom:1px solid var(--inset-border);">
+          <span class="pr-name" style="color:var(--text-muted); font-weight:500;">${ov.total_processes} processes · ${ov.cpu_total_percent.toFixed(0)}% CPU total</span>
+          <span class="pr-metric">${ov.memory_used_percent.toFixed(0)}% RAM</span>
+        </div>
+        ${tasksRes.value.tasks
+          .map(
+            (t) => `
+          <div class="panel-row">
+            <span class="pr-name"><code style="font-family:var(--font-mono); font-size:0.7rem; color:var(--text-subtle);">${t.pid}</code> ${esc(t.name)}</span>
+            <span class="pr-metric">${t.cpu_percent.toFixed(1)}% · ${esc(t.memory_formatted)}</span>
+          </div>`
+          )
+          .join('')}`;
+    } else {
+      panelError('homeProcs', 'process list');
+    }
+  }
+
+  // --- Heaviest services panel ---
+  const svcs = container.querySelector('#homeSvcs') as HTMLElement | null;
+  if (svcs) {
+    if (svcsRes.status === 'fulfilled') {
+      const failed = svcsRes.value.overview.failed_services ?? 0;
+      svcs.innerHTML = `
+        <div class="panel-row" style="border-bottom:1px solid var(--inset-border);">
+          <span class="pr-name" style="color:var(--text-muted); font-weight:500;">${svcsRes.value.overview.running_services} running${failed ? ` · ${failed} failed` : ''}</span>
+          <span class="pr-metric">${esc(svcsRes.value.overview.total_memory_formatted)} RAM</span>
+        </div>
+        ${svcsRes.value.services
+          .map(
+            (s) => `
+          <div class="panel-row">
+            <span class="pr-name"><span class="status-dot ${s.active_state === 'active' ? 'status-green' : 'status-gray'}"></span> ${esc(s.name)}</span>
+            <span class="pr-metric">${esc(s.memory_formatted)}</span>
+          </div>`
+          )
+          .join('')}`;
+    } else {
+      panelError('homeSvcs', 'service list');
+    }
+  }
+
+  markUpdated(container);
+}
+
+async function refreshVitals(container: HTMLElement): Promise<void> {
   try {
-    const kernelData = await fetchKernelHealth();
-    const journalPill = container.querySelector('#homeJournalPill') as HTMLElement;
-    const journalPreview = container.querySelector('#homeJournalPreview') as HTMLElement;
-
-    if (journalPreview) {
-      const oomCount = kernelData.oom_kill_count || 0;
-      const memPsi = kernelData.memory_pressure?.some?.avg10 || 0;
-      const cpuPsi = kernelData.cpu_pressure?.some?.avg10 || 0;
-
-      if (journalPill) {
-        journalPill.textContent = oomCount > 0 ? `⚠️ ${oomCount} OOM` : 'Healthy';
-        journalPill.className = oomCount > 0 ? 'pill pill-error' : 'pill pill-live';
-      }
-
-      journalPreview.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          <div class="home-c-row">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="status-dot ${oomCount === 0 ? 'status-green' : 'status-red'}"></span>
-              <strong>Kernel OOM Killer</strong>
-            </div>
-            <span class="badge ${oomCount === 0 ? 'badge-success' : 'badge-error'}">${oomCount} Kills</span>
-          </div>
-          <div class="home-c-row">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="status-dot status-green"></span>
-              <strong>Memory PSI Stall</strong>
-            </div>
-            <span class="badge badge-info">${memPsi.toFixed(2)}% avg10</span>
-          </div>
-          <div class="home-c-row">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="status-dot status-green"></span>
-              <strong>CPU PSI Stall</strong>
-            </div>
-            <span class="badge badge-info">${cpuPsi.toFixed(2)}% avg10</span>
-          </div>
-        </div>
-      `;
-    }
-  } catch (err) {
-    console.warn('Home journal fetch error', err);
+    const sys: SystemSnapshot = await fetchSystemMetrics();
+    paintVitals(sys);
+    markUpdated(container);
+  } catch {
+    // keep last-known values on transient poll failures
   }
+}
 
-  // 8. Fetch Maintenance Preview
-  try {
-    const maintData = await fetchMaintenanceDf();
-    const maintPill = container.querySelector('#homeMaintPill') as HTMLElement;
-    const maintPreview = container.querySelector('#homeMaintPreview') as HTMLElement;
+function paintVitals(sys: SystemSnapshot): void {
+  const gSize = window.innerWidth <= 480 ? 52 : 64;
+  const cpu = document.getElementById('homeVitalCpu');
+  const ram = document.getElementById('homeVitalRam');
+  const disk = document.getElementById('homeVitalDisk');
+  const net = document.getElementById('homeVitalNet');
+  const cpuPct = sys.cpu.total_percent;
+  const memPct = sys.memory.used_percent;
+  const diskPct = sys.disk.used_percent;
 
-    if (maintPreview) {
-      const disk = maintData.disk_root;
-      if (maintPill) {
-        maintPill.textContent = `${formatBytes(disk.free_bytes)} Free`;
-      }
-
-      maintPreview.innerHTML = `
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          <div class="home-c-row">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="status-dot status-green"></span>
-              <strong>Host Root Partition</strong>
-            </div>
-            <span class="badge badge-info">${disk.used_percent}% used (${formatBytes(disk.free_bytes)} free)</span>
-          </div>
-          <div class="home-c-row">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="status-dot status-green"></span>
-              <strong>Docker Storage</strong>
-            </div>
-            <span class="badge badge-success">${maintData.docker.length} tracked types</span>
-          </div>
-        </div>
-      `;
-    }
-  } catch (err) {
-    console.warn('Home maint fetch error', err);
+  if (cpu)
+    cpu.innerHTML = vitalInner(
+      'CPU',
+      renderDonutGauge(cpuPct, { size: gSize, strokeWidth: 5, color: gaugeColor(cpuPct) }),
+      `${cpuPct.toFixed(0)}%`,
+      `${sys.cpu.core_count_logical} cores`
+    );
+  if (ram)
+    ram.innerHTML = vitalInner(
+      'Memory',
+      renderDonutGauge(memPct, { size: gSize, strokeWidth: 5, color: '#7c3aed' }),
+      `${memPct.toFixed(0)}%`,
+      `${formatBytes(sys.memory.used_bytes)} / ${formatBytes(sys.memory.total_bytes)}`
+    );
+  if (disk)
+    disk.innerHTML = vitalInner(
+      'Disk',
+      renderDonutGauge(diskPct, { size: gSize, strokeWidth: 5, color: gaugeColor(diskPct) }),
+      `${diskPct.toFixed(0)}%`,
+      `${formatBytes(sys.disk.free_bytes)} free`
+    );
+  if (net) {
+    const rx = sys.network.bytes_recv_per_sec || 0;
+    const tx = sys.network.bytes_sent_per_sec || 0;
+    net.innerHTML = `
+      <div class="vital-donut-wrap" style="width:${gSize}px; height:${gSize}px; border-radius:8px; background:var(--inset-bg); display:flex; align-items:center; justify-content:center; color:#0891b2;">${icon('globe', 24)}</div>
+      <div class="fleet-vital-meta">
+        <span class="fleet-vital-label">Network</span>
+        <span class="fleet-vital-value">${formatBytes(rx + tx)}/s</span>
+        <span class="fleet-vital-sub">↓ ${formatBytes(rx)}/s · ↑ ${formatBytes(tx)}/s</span>
+      </div>`;
   }
+}
+
+function markUpdated(container: HTMLElement): void {
+  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const note = container.querySelector('#homeUpdated') as HTMLElement | null;
+  const note2 = container.querySelector('#homeUpdated2') as HTMLElement | null;
+  if (note) note.textContent = `Updated ${now}`;
+  if (note2) note2.textContent = `Updated ${now}`;
 }

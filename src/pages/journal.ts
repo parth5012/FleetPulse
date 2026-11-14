@@ -50,7 +50,7 @@ export async function renderJournal(container: HTMLElement): Promise<void> {
           <div class="tile-val" id="memPsiVal">0.0%</div>
           <div class="tile-sub" id="memPsiSub">avg10: 0% · avg60: 0% · avg300: 0%</div>
           <div class="bar-outer" style="height:4px;margin-top:6px;">
-            <div class="bar-inner" id="memPsiBar" style="width:0%;background:#a855f7;"></div>
+            <div class="bar-inner" id="memPsiBar" style="width:0%;background:#7c3aed;"></div>
           </div>
         </div>
 
@@ -60,7 +60,7 @@ export async function renderJournal(container: HTMLElement): Promise<void> {
           <div class="tile-val" id="cpuPsiVal">0.0%</div>
           <div class="tile-sub" id="cpuPsiSub">avg10: 0% · avg60: 0% · avg300: 0%</div>
           <div class="bar-outer" style="height:4px;margin-top:6px;">
-            <div class="bar-inner" id="cpuPsiBar" style="width:0%;background:#10b981;"></div>
+            <div class="bar-inner" id="cpuPsiBar" style="width:0%;background:#059669;"></div>
           </div>
         </div>
 
@@ -70,7 +70,7 @@ export async function renderJournal(container: HTMLElement): Promise<void> {
           <div class="tile-val" id="ioPsiVal">0.0%</div>
           <div class="tile-sub" id="ioPsiSub">avg10: 0% · avg60: 0% · avg300: 0%</div>
           <div class="bar-outer" style="height:4px;margin-top:6px;">
-            <div class="bar-inner" id="ioPsiBar" style="width:0%;background:#f59e0b;"></div>
+            <div class="bar-inner" id="ioPsiBar" style="width:0%;background:#d97706;"></div>
           </div>
         </div>
       </div>
@@ -126,7 +126,7 @@ export async function renderJournal(container: HTMLElement): Promise<void> {
 
       if (data.oom_kill_count > 0) {
         oomVal.textContent = String(data.oom_kill_count);
-        oomVal.style.color = '#ef4444';
+        oomVal.style.color = '#dc2626';
         oomSub.textContent = `Warning: ${data.oom_kill_count} OOM termination events detected!`;
         oomBadge.className = 'badge badge-error';
         oomBadge.textContent = `${data.oom_kill_count} OOM KILLS`;

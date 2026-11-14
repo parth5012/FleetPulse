@@ -73,7 +73,7 @@ function createSmoothPath(points: { x: number; y: number }[]): string {
 export function renderSparkline(values: number[], options: SparklineOptions = {}): string {
   const width = options.width || 120;
   const height = options.height || 36;
-  const color = options.color || '#10b981';
+  const color = options.color || 'var(--primary, #047857)';
   const strokeWidth = options.strokeWidth || 2;
   const gradient = options.gradient !== false;
 
@@ -458,8 +458,8 @@ export function renderBeszelChart(
     }
 
     gridSvg += `
-      <line x1="${paddingLeft}" y1="${y.toFixed(1)}" x2="${width - paddingRight}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3,3" />
-      <text x="${paddingLeft - 8}" y="${(y + 3.5).toFixed(1)}" fill="#71717a" font-size="9.5" text-anchor="end" font-family="var(--font-mono)">${valLabel}</text>
+      <line x1="${paddingLeft}" y1="${y.toFixed(1)}" x2="${width - paddingRight}" y2="${y.toFixed(1)}" stroke="var(--grid-line, #eef0f3)" stroke-dasharray="3,3" />
+      <text x="${paddingLeft - 8}" y="${(y + 3.5).toFixed(1)}" fill="var(--text-subtle, #9ca3af)" font-size="9.5" text-anchor="end" font-family="var(--font-mono)">${valLabel}</text>
     `;
   }
 
@@ -519,14 +519,14 @@ export function renderBeszelChart(
     }
 
     // Baseline axis tick line
-    xAxisSvg += `<line x1="${paddingLeft}" y1="${baseline}" x2="${width - paddingRight}" y2="${baseline}" stroke="rgba(255,255,255,0.08)" />`;
+    xAxisSvg += `<line x1="${paddingLeft}" y1="${baseline}" x2="${width - paddingRight}" y2="${baseline}" stroke="var(--card-border, #e5e7eb)" />`;
 
     indices.forEach((idx) => {
       const ts = timestamps[idx];
       const x = paddingLeft + (timestamps.length > 1 ? (idx / (timestamps.length - 1)) * drawWidth : drawWidth / 2);
       xAxisSvg += `
-        <line x1="${x.toFixed(1)}" y1="${baseline}" x2="${x.toFixed(1)}" y2="${(baseline + 4).toFixed(1)}" stroke="rgba(255,255,255,0.15)" />
-        <text x="${x.toFixed(1)}" y="${(baseline + 16).toFixed(1)}" fill="#71717a" font-size="9.5" text-anchor="middle" font-family="var(--font-mono)">${formatChartTime(ts)}</text>
+        <line x1="${x.toFixed(1)}" y1="${baseline}" x2="${x.toFixed(1)}" y2="${(baseline + 4).toFixed(1)}" stroke="var(--border-strong, #d1d5db)" />
+        <text x="${x.toFixed(1)}" y="${(baseline + 16).toFixed(1)}" fill="var(--text-subtle, #9ca3af)" font-size="9.5" text-anchor="middle" font-family="var(--font-mono)">${formatChartTime(ts)}</text>
       `;
     });
   }

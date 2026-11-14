@@ -241,7 +241,7 @@ function renderVitals(container: HTMLElement): void {
     activeDonutEl.innerHTML = renderDonutGauge(activePct, {
       size: donutSize,
       strokeWidth: isMobile ? 4 : 5,
-      color: '#10b981',
+      color: '#059669',
     });
   }
 
@@ -259,7 +259,7 @@ function renderVitals(container: HTMLElement): void {
   const memDistEl = container.querySelector('#svcMemDistBar') as HTMLElement;
 
   if (distCard && memDistEl && state.services.length > 0) {
-    const colors = ['#10b981', '#a855f7', '#f59e0b', '#06b6d4', '#ec4899'];
+    const colors = ['#059669', '#7c3aed', '#d97706', '#0891b2', '#db2777'];
     const topMemSvcs = [...state.services]
       .sort((a, b) => b.memory_bytes - a.memory_bytes)
       .slice(0, 5)

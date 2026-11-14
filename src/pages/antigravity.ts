@@ -28,22 +28,22 @@ function getBucketStatus(bucket: QuotaBucket): {
   const pct = Math.round(fraction * 100);
   let statusClass = 'ok';
   let statusText = `${pct}%`;
-  let color = '#10b981';
+  let color = '#059669';
 
   if (bucket.disabled) {
     statusClass = 'med';
     statusText = 'Capped';
-    color = '#f59e0b';
+    color = '#d97706';
   } else if (pct === 0 || fraction < 0.05) {
     statusClass = 'low';
     statusText = '0% Exhausted';
-    color = '#ef4444';
+    color = '#dc2626';
   } else if (pct < 45) {
     statusClass = 'med';
     statusText = `${pct}% Low`;
-    color = '#f59e0b';
+    color = '#d97706';
   } else {
-    color = '#10b981';
+    color = '#059669';
   }
 
   return { pct, statusClass, statusText, color };
@@ -190,7 +190,7 @@ function renderAccount(acc: AccountSnapshot): string {
     size: isMobile ? 52 : 64,
     strokeWidth: isMobile ? 5 : 6,
     label: 'Quota',
-    color: healthPct > 50 ? '#10b981' : healthPct > 20 ? '#f59e0b' : '#ef4444',
+    color: healthPct > 50 ? '#059669' : healthPct > 20 ? '#d97706' : '#dc2626',
   });
 
   return `
@@ -228,12 +228,12 @@ function safeUrl(url: string | undefined | null): string {
 function qoderStatusColor(fraction: number): { statusClass: string; statusText: string; color: string } {
   const pct = Math.round(fraction * 100);
   if (fraction <= 0.001) {
-    return { statusClass: 'low', statusText: '0% Exhausted', color: '#ef4444' };
+    return { statusClass: 'low', statusText: '0% Exhausted', color: '#dc2626' };
   }
   if (pct < 20) {
-    return { statusClass: 'med', statusText: `${pct}% Low`, color: '#f59e0b' };
+    return { statusClass: 'med', statusText: `${pct}% Low`, color: '#d97706' };
   }
-  return { statusClass: 'ok', statusText: `${pct}%`, color: '#10b981' };
+  return { statusClass: 'ok', statusText: `${pct}%`, color: '#059669' };
 }
 
 function renderQoderAmountBar(title: string, amount: QoderQuotaAmount, poolLabel: string): string {
@@ -354,7 +354,7 @@ function renderQoderAccount(acc: QoderAccountSnapshot): string {
     size: isMobile ? 52 : 64,
     strokeWidth: isMobile ? 5 : 6,
     label: 'Quota',
-    color: healthPct > 50 ? '#10b981' : healthPct > 20 ? '#f59e0b' : '#ef4444',
+    color: healthPct > 50 ? '#059669' : healthPct > 20 ? '#d97706' : '#dc2626',
   });
 
   const trialStr = acc.expiresAt
@@ -504,7 +504,7 @@ export async function renderAntigravity(container: HTMLElement): Promise<void> {
       let claudeFractionSum = 0;
 
       const accountSegments: StackedSegment[] = [];
-      const colors = ['#10b981', '#a855f7', '#f59e0b', '#06b6d4', '#ec4899'];
+      const colors = ['#059669', '#7c3aed', '#d97706', '#0891b2', '#db2777'];
 
       accs.forEach((a, idx) => {
         let accFraction = 0;
@@ -576,7 +576,7 @@ export async function renderAntigravity(container: HTMLElement): Promise<void> {
           size: ribbonGaugeSize,
           strokeWidth: ribbonStrokeWidth,
           label: 'Overall',
-          color: overallPct > 50 ? '#10b981' : overallPct > 20 ? '#f59e0b' : '#ef4444',
+          color: overallPct > 50 ? '#059669' : overallPct > 20 ? '#d97706' : '#dc2626',
         });
       }
 
@@ -586,7 +586,7 @@ export async function renderAntigravity(container: HTMLElement): Promise<void> {
           size: ribbonGaugeSize,
           strokeWidth: ribbonStrokeWidth,
           label: 'Gemini',
-          color: '#10b981',
+          color: '#059669',
         });
       }
 
@@ -596,7 +596,7 @@ export async function renderAntigravity(container: HTMLElement): Promise<void> {
           size: ribbonGaugeSize,
           strokeWidth: ribbonStrokeWidth,
           label: '3P / Claude',
-          color: claudePct > 50 ? '#a855f7' : claudePct > 20 ? '#f59e0b' : '#ef4444',
+          color: claudePct > 50 ? '#7c3aed' : claudePct > 20 ? '#d97706' : '#dc2626',
         });
       }
 
