@@ -3,7 +3,11 @@ type RenderFn = (container: HTMLElement) => void | Promise<void>;
 let activeCleanup: (() => void) | null = null;
 
 const routes: Record<string, () => Promise<RenderFn>> = {
-  '/': async () => (await import('./pages/home')).renderHome,
+  '/': async () => {
+    const mod = await import('./pages/home');
+    activeCleanup = mod.cleanupHome;
+    return mod.renderHome;
+  },
   '/tasks': async () => {
     const mod = await import('./pages/tasks');
     activeCleanup = mod.cleanupTasks;
@@ -38,8 +42,8 @@ function currentPath(): string {
 }
 
 function setActive(path: string): void {
-  // Update both desktop header nav and mobile bottom tab bar
-  document.querySelectorAll('#shellNav a, #mobileNav a').forEach((a) => {
+  // Update desktop sidebar, mobile bottom bar, and the More sheet items.
+  document.querySelectorAll('.nav-item, .more-item').forEach((a) => {
     const r = (a as HTMLElement).dataset.route;
     a.classList.toggle('active', r === path);
   });
@@ -59,7 +63,7 @@ export const router = {
     const path = currentPath();
     setActive(path);
     const page = document.getElementById('page')!;
-    page.innerHTML = '<div class="empty-state"><p class="spin">⚡</p><p>Loading...</p></div>';
+    page.innerHTML = '<div class="page-loading"><span class="live-dot live-dot-lg" aria-hidden="true"></span><p>Loading…</p></div>';
     const loader = routes[path] || routes['/'];
     try {
       const renderFn = await loader();
