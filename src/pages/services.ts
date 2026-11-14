@@ -5,6 +5,7 @@
  */
 
 import { fetchServices, triggerServiceAction, ServiceItem, ServicesOverview } from '../lib/api';
+import { confirmDialog } from '../lib/ui';
 import { esc } from '../lib/format';
 import { renderDonutGauge, renderStackedBar, StackedSegment } from '../lib/charts';
 
@@ -448,7 +449,12 @@ function renderServicesList(view: Element): void {
       const scope = (el.dataset.scope || 'user') as 'user' | 'system';
       const unit = el.dataset.unit || '';
 
-      const confirmed = window.confirm(`Restart ${scope} service "${unit}"?`);
+      const confirmed = await confirmDialog({
+        title: `Restart "${unit}"?`,
+        message: `This restarts the ${scope} systemd unit "${unit}". Brief downtime while it comes back up.`,
+        confirmLabel: 'Restart',
+        danger: false,
+      });
       if (!confirmed) return;
 
       el.setAttribute('disabled', 'true');

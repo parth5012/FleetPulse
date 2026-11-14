@@ -41,34 +41,33 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
 
         <div class="beszel-header-controls">
           <div class="beszel-time-dropdown-wrap">
-            <span class="time-icon">⏱️</span>
-            <select id="beszelTimeSelect" class="beszel-select">
-              <option value="1" selected>1 hour</option>
-              <option value="6">6 hours</option>
-              <option value="24">24 hours</option>
-              <option value="168">7 days</option>
+            <select id="beszelTimeSelect" class="beszel-select" aria-label="Timeframe">
+              <option value="1" selected>Last 1 hour</option>
+              <option value="6">Last 6 hours</option>
+              <option value="24">Last 24 hours</option>
+              <option value="168">Last 7 days</option>
             </select>
           </div>
-          <button id="refreshBeszelBtn" class="beszel-icon-btn" title="Refresh Telemetry">🎛️</button>
+          <button id="refreshBeszelBtn" class="beszel-icon-btn" title="Refresh telemetry" aria-label="Refresh telemetry">↻</button>
         </div>
       </div>
 
       <div class="beszel-meta-chips" id="bMetaChips">
-        <div class="chip-item"><span class="chip-icon">🌐</span> <code id="bIp">-</code></div>
-        <div class="chip-item"><span class="chip-icon">💻</span> <strong id="bHostname">-</strong></div>
-        <div class="chip-item"><span class="chip-icon">⏱️</span> <span id="bUptime">-</span></div>
-        <div class="chip-item"><span class="chip-icon">🐧</span> <span id="bDistro">-</span></div>
-        <div class="chip-item"><span class="chip-icon">⚙️</span> <span id="bCpuModel">-</span></div>
-        <div class="chip-item"><span class="chip-icon">💾</span> <strong id="bRamTotal" style="color:#10b981;">-</strong></div>
+        <div class="chip-item"><code id="bIp">-</code></div>
+        <div class="chip-item"><strong id="bHostname">-</strong></div>
+        <div class="chip-item"><span id="bUptime">-</span></div>
+        <div class="chip-item"><span id="bDistro">-</span></div>
+        <div class="chip-item"><span id="bCpuModel">-</span></div>
+        <div class="chip-item"><strong id="bRamTotal">-</strong></div>
       </div>
     </div>
 
     <!-- Beszel Sub-Navigation Tabs -->
     <div class="beszel-subnav" id="beszelSubnav">
-      <button class="beszel-tab active" data-tab="core"><span class="tab-icon">⚙️</span> Core</button>
-      <button class="beszel-tab" data-tab="network"><span class="tab-icon">🌐</span> Network</button>
-      <button class="beszel-tab" data-tab="disk"><span class="tab-icon">💾</span> Disk</button>
-      <button class="beszel-tab" data-tab="containers"><span class="tab-icon">🐳</span> Containers</button>
+      <button class="beszel-tab active" data-tab="core">Core</button>
+      <button class="beszel-tab" data-tab="network">Network</button>
+      <button class="beszel-tab" data-tab="disk">Disk</button>
+      <button class="beszel-tab" data-tab="containers">Containers</button>
     </div>
 
     <!-- Active Tab Container (2x2 Chart Grid) -->
@@ -81,8 +80,8 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
       <div class="sqlite-stats-header">
         <div>
           <div class="sqlite-title">
-            <span>🗄️ SQLite Persistent Telemetry & Rolling Averages</span>
-            <span class="badge badge-info" id="sqliteSampleBadge">Active Engine</span>
+            <span>Persistent telemetry & rolling averages</span>
+            <span class="badge badge-info" id="sqliteSampleBadge">Active engine</span>
           </div>
           <div class="muted" style="font-size:0.8rem;margin-top:2px;">
             Historical metrics database: rolling averages, peak loads, and RAM consumption across timeframes
