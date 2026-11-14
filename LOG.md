@@ -87,3 +87,9 @@
 - **What went well:** Zero-dependency SVG approach yielded high-fps, crisp graphs without extra bundle overhead; real Docker CLI integration combined with automatic fallback ensures both local hardware stats and CI/sandboxed tests pass 100% reliably.
 - **What broke:** In early test runs, `test_containers.py` invoked real docker restart against local containers; quickly mitigated by mocking action tests so user container fleet remains completely uninterrupted.
 - **What to improve next time:** Add WebSocket support alongside SSE for bi-directional terminal input in future iterations.
+
+## 2026-11-14 — UI/UX redesign variant "Calm Ops" (branch ch/calm-ops-shell-home-redesign)
+- **Status:** Done
+- **What changed:** Rewrote token system (near-black ladder, hairlines, single emerald accent, 8pt grid, type scale, focus ring), shell (sidebar desktop + 4-primary/More-sheet mobile nav), Home page (vitals strip with 24h sparklines + threshold colors, labeled status band, live activity cards, quiet explore links), System page restyle, new SVG icon set (src/lib/icons.ts). Removed glows/gradients/emoji; semantic badges rebuilt. DESIGN.md added.
+- **Verification:** tsc --noEmit clean; pnpm build clean; 16 vitest + 97 pytest pass; Impeccable detector: 5 benign width-transition warnings; screenshots (.tmp/screenshots: home desktop 1440x900, home mobile 390x844, More sheet, system desktop) captured via Playwright against the live FastAPI backend, all >100KB.
+- **Decisions:** Dark-first (light theme kept as mapped fallback); vitals bars escalate to amber >70% / red >85%; Home has no filled CTA; dead legacy .home-hero styles removed.
