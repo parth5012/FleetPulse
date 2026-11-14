@@ -1,8 +1,8 @@
 /**
  * Glanceboard shell.
- * Desktop (>=1024px): quiet left sidebar with grouped navigation.
- * Mobile (<1024px): slim top bar + 5-item bottom nav; "More" opens a
- * bottom sheet holding the remaining routes. All touch targets >= 44px.
+ * Desktop (>=1024px): quiet left sidebar with grouped navigation (5 core pages).
+ * Mobile (<1024px): slim top bar + exactly 5-item bottom nav (Home, System, Tasks, Apps, Ops).
+ * All touch targets >= 44px. Safe-area insets handled.
  */
 
 export interface NavItem {
@@ -16,42 +16,28 @@ function svg(body: string): string {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 }
 
-const I = {
+export const I = {
   home: svg('<path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.3V21h13V9.3"/>'),
   system: svg('<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9.5" y="9.5" width="5" height="5"/><path d="M9 2.5V5M15 2.5V5M9 19v2.5M15 19v2.5M2.5 9H5M2.5 15H5M19 9h2.5M19 15h2.5"/>'),
   tasks: svg('<path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>'),
   apps: svg('<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>'),
-  more: svg('<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>'),
-  services: svg('<rect x="3.5" y="4" width="17" height="6.5" rx="1.5"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="1.5"/><path d="M7 7.2h.01M7 16.7h.01"/>'),
-  containers: svg('<path d="M12 2.5 21 7.4v9.2l-9 4.9-9-4.9V7.4z"/><path d="M3.4 7.6 12 12.3l8.6-4.7M12 22V12.3"/>'),
-  network: svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 3.6 2.8 14.4 0 18-2.8-3.6-2.8-14.4 0-18z"/>'),
-  journal: svg('<path d="M14 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8z"/><path d="M14 2.5V8h5.5M9 13h6M9 17h4"/>'),
-  maintenance: svg('<path d="M14.5 6.5a4 4 0 0 0-5.4 5.2L3.5 17.3l3.2 3.2 5.6-5.6a4 4 0 0 0 5.2-5.4l-2.7 2.7-2.4-.6-.6-2.4z"/>'),
-  quotas: svg('<path d="M4.5 15.5a8 8 0 1 1 15 0"/><path d="M12 15.5l3.8-3.8"/><circle cx="12" cy="15.5" r="1.2"/>'),
+  ops: svg('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>'),
 };
 
-// Primary mobile items (thumb zone) — most used first.
-const primaryNav: NavItem[] = [
+// 5 Consolidated Core Pages
+export const navItems: NavItem[] = [
   { route: '/', label: 'Home', desc: 'Fleet health at a glance', icon: I.home },
-  { route: '/system', label: 'System', desc: 'CPU, RAM, disk & network vitals', icon: I.system },
+  { route: '/system', label: 'System', desc: 'Host vitals & network mesh', icon: I.system },
   { route: '/tasks', label: 'Tasks', desc: 'Live process manager', icon: I.tasks },
-  { route: '/apps', label: 'Apps', desc: 'Start & stop curated apps', icon: I.apps },
+  { route: '/apps', label: 'Apps', desc: 'Apps, services & containers', icon: I.apps },
+  { route: '/ops', label: 'Ops', desc: 'Maintenance, journal & quotas', icon: I.ops },
 ];
 
-const moreNav: NavItem[] = [
-  { route: '/services', label: 'Services', desc: 'systemd daemons', icon: I.services },
-  { route: '/containers', label: 'Containers', desc: 'Docker fleet & logs', icon: I.containers },
-  { route: '/network', label: 'Network', desc: 'Tailscale mesh & ports', icon: I.network },
-  { route: '/journal', label: 'Journal', desc: 'Kernel & systemd logs', icon: I.journal },
-  { route: '/maintenance', label: 'Maintenance', desc: 'Prune, vacuum, restarts', icon: I.maintenance },
-  { route: '/antigravity', label: 'Quotas', desc: 'AI account quota pools', icon: I.quotas },
-];
-
-// Desktop sidebar groups.
+// Desktop sidebar groups
 const sidebarGroups: { title: string; items: NavItem[] }[] = [
-  { title: 'Monitor', items: [primaryNav[0], primaryNav[1], moreNav[2], moreNav[3]] },
-  { title: 'Operate', items: [primaryNav[2], moreNav[0], moreNav[1], moreNav[4]] },
-  { title: 'Apps', items: [primaryNav[3], moreNav[5]] },
+  { title: 'Monitor', items: [navItems[0], navItems[1]] },
+  { title: 'Workloads', items: [navItems[2], navItems[3]] },
+  { title: 'Administration', items: [navItems[4]] },
 ];
 
 function navLink(item: NavItem, extraClass = ''): string {
@@ -61,10 +47,6 @@ function navLink(item: NavItem, extraClass = ''): string {
       <span class="gb-nav-label">${item.label}</span>
     </a>
   `;
-}
-
-function iconFor(route: string): string {
-  return [...primaryNav, ...moreNav].find((n) => n.route === route)?.icon || I.more;
 }
 
 export function renderShell(root: HTMLElement): void {
@@ -108,82 +90,15 @@ export function renderShell(root: HTMLElement): void {
 
         <main id="page" class="page-content gb-page"></main>
 
-        <!-- Mobile bottom nav: 5 items max, thumb zone -->
+        <!-- Mobile bottom nav: exactly 5 items, thumb zone -->
         <nav class="gb-bottomnav" id="mobileNav" aria-label="Primary">
-          ${primaryNav.map((it) => navLink(it, 'gb-tab')).join('')}
-          <button type="button" id="gbMoreBtn" class="gb-tab gb-tab-more" aria-expanded="false" aria-controls="gbMoreSheet">
-            <span class="gb-nav-icon">${I.more}</span>
-            <span class="gb-nav-label">More</span>
-          </button>
+          ${navItems.map((it) => navLink(it, 'gb-tab')).join('')}
         </nav>
-
-        <!-- "More" bottom sheet (mobile) -->
-        <div class="gb-sheet-backdrop" id="gbSheetBackdrop" hidden></div>
-        <div class="gb-sheet" id="gbMoreSheet" role="dialog" aria-modal="true" aria-label="More pages" hidden>
-          <div class="gb-sheet-grab" aria-hidden="true"></div>
-          <div class="gb-sheet-title">More</div>
-          <div class="gb-sheet-grid">
-            ${moreNav
-              .map(
-                (it) => `
-              <a href="#${it.route}" data-route="${it.route}" class="gb-sheet-item">
-                <span class="gb-sheet-icon">${it.icon}</span>
-                <span class="gb-sheet-text">
-                  <span class="gb-sheet-label">${it.label}</span>
-                  <span class="gb-sheet-desc">${it.desc}</span>
-                </span>
-              </a>
-            `
-              )
-              .join('')}
-          </div>
-        </div>
       </div>
     </div>
   `;
 
-  wireMoreSheet();
   wireFreshness();
-}
-
-// ---------------------------------------------------------------------------
-// More sheet
-// ---------------------------------------------------------------------------
-
-function setSheetOpen(open: boolean): void {
-  const backdrop = document.getElementById('gbSheetBackdrop');
-  const sheet = document.getElementById('gbMoreSheet');
-  const btn = document.getElementById('gbMoreBtn');
-  if (!backdrop || !sheet || !btn) return;
-  backdrop.hidden = !open;
-  sheet.hidden = !open;
-  btn.setAttribute('aria-expanded', String(open));
-  // Slide-up transition needs one frame before removing [hidden].
-  requestAnimationFrame(() => sheet.classList.toggle('open', open));
-  if (open) (sheet.querySelector('.gb-sheet-item') as HTMLElement | null)?.focus();
-  else btn.focus();
-}
-
-function wireMoreSheet(): void {
-  const btn = document.getElementById('gbMoreBtn');
-  const backdrop = document.getElementById('gbSheetBackdrop');
-  btn?.addEventListener('click', () => {
-    const sheet = document.getElementById('gbMoreSheet');
-    setSheetOpen(!sheet || sheet.hidden);
-  });
-  backdrop?.addEventListener('click', () => setSheetOpen(false));
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') setSheetOpen(false);
-  });
-  // Close the sheet whenever navigation happens from inside it.
-  document.getElementById('gbMoreSheet')?.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement).closest('a')) setSheetOpen(false);
-  });
-}
-
-/** Highlight the More button when the active route lives in the sheet. */
-export function setMoreActive(active: boolean): void {
-  document.getElementById('gbMoreBtn')?.classList.toggle('active', active);
 }
 
 let lastRender = Date.now();
@@ -209,19 +124,4 @@ function wireFreshness(): void {
   if (freshnessTimer !== null) window.clearInterval(freshnessTimer);
   freshnessTimer = window.setInterval(paintFreshness, 5000);
   paintFreshness();
-}
-
-// ---------------------------------------------------------------------------
-// PWA install — mirror the main.ts handler onto the mobile button too
-// ---------------------------------------------------------------------------
-
-function syncMobileInstallButton(): void {
-  const desktopBtn = document.getElementById('pwaInstallBtn');
-  const mobileBtn = document.getElementById('pwaInstallBtnMobile');
-  if (!desktopBtn || !mobileBtn) return;
-  const sync = () => {
-    mobileBtn.style.display = desktopBtn.style.display;
-  };
-  new MutationObserver(sync).observe(desktopBtn, { attributes: true, attributeFilter: ['style'] });
-  sync();
 }

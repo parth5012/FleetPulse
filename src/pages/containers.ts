@@ -10,8 +10,39 @@ import { esc } from '../lib/format';
 import { confirmDialog } from '../lib/ui';
 import type { ContainerSummary, LogLine } from '../lib/api';
 
-export async function renderContainers(container: HTMLElement): Promise<void> {
+let activeLogTimerId: number | null = null;
+let activeFleetTimerId: number | null = null;
+
+export function cleanupContainers(): void {
+  if (activeLogTimerId) {
+    clearInterval(activeLogTimerId);
+    activeLogTimerId = null;
+  }
+  if (activeFleetTimerId) {
+    clearInterval(activeFleetTimerId);
+    activeFleetTimerId = null;
+  }
+}
+
+export async function renderContainers(container: HTMLElement, isTab = false): Promise<void> {
+  cleanupContainers();
+
   container.innerHTML = `
+    ${
+      isTab
+        ? `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <h2 style="font-size:1.15rem; font-weight:600; margin:0;">Docker Containers & Log Console</h2>
+            <span class="pill pill-live" id="fleetPill">Connecting...</span>
+          </div>
+          <p class="muted" style="font-size:0.82rem; margin:2px 0 0;">Inspect containers, live stream ANSI logs, and control container state.</p>
+        </div>
+        <button id="refreshFleetBtn" class="btn btn-secondary btn-sm"><span id="fleetRefreshIcon">🔄</span> Refresh Fleet</button>
+      </div>
+    `
+        : `
     <header class="page-header">
       <div>
         <div style="display:flex;align-items:center;gap:10px;">
@@ -26,6 +57,8 @@ export async function renderContainers(container: HTMLElement): Promise<void> {
         <button id="refreshFleetBtn" class="btn"><span id="fleetRefreshIcon">🔄</span> Refresh Fleet</button>
       </div>
     </header>
+    `
+    }
 
     <div class="dozzel-layout">
       <!-- Left Sidebar: Container Fleet -->
@@ -396,21 +429,20 @@ export async function renderContainers(container: HTMLElement): Promise<void> {
   await loadFleet();
 
   // Log stream polling every 2s
-  logTimerId = window.setInterval(() => {
+  activeLogTimerId = window.setInterval(() => {
     if (selectedContainer) {
       fetchAndRenderLogs();
     }
   }, 2000);
 
   // Fleet refresh polling every 6s
-  fleetTimerId = window.setInterval(loadFleet, 6000);
+  activeFleetTimerId = window.setInterval(loadFleet, 6000);
 
   // Cleanup on route departure
   window.addEventListener(
     'hashchange',
     () => {
-      if (logTimerId) clearInterval(logTimerId);
-      if (fleetTimerId) clearInterval(fleetTimerId);
+      cleanupContainers();
     },
     { once: true }
   );

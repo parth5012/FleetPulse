@@ -7,52 +7,65 @@ let activeCleanup: (() => void) | null = null;
 
 const routes: Record<string, () => Promise<RenderFn>> = {
   '/': async () => (await import('./pages/home')).renderHome,
+  '/system': async () => {
+    const mod = await import('./pages/system');
+    activeCleanup = mod.cleanupSystem;
+    return mod.renderSystem;
+  },
   '/tasks': async () => {
     const mod = await import('./pages/tasks');
     activeCleanup = mod.cleanupTasks;
     return mod.renderTasks;
   },
-  '/services': async () => {
-    const mod = await import('./pages/services');
-    activeCleanup = mod.cleanupServices;
-    return mod.renderServices;
+  '/apps': async () => {
+    const mod = await import('./pages/apps');
+    activeCleanup = mod.cleanupApps;
+    return mod.renderApps;
   },
-  '/system': async () => (await import('./pages/system')).renderSystem,
-  '/containers': async () => (await import('./pages/containers')).renderContainers,
-  '/apps': async () => (await import('./pages/apps')).renderApps,
-  '/antigravity': async () => (await import('./pages/antigravity')).renderAntigravity,
-  '/network': async () => {
-    const mod = await import('./pages/network');
-    activeCleanup = mod.cleanupNetwork;
-    return mod.renderNetwork;
+  '/ops': async () => {
+    const mod = await import('./pages/ops');
+    activeCleanup = mod.cleanupOps;
+    return mod.renderOps;
   },
-  '/journal': async () => {
-    const mod = await import('./pages/journal');
-    activeCleanup = mod.cleanupJournal;
-    return mod.renderJournal;
-  },
-  '/maintenance': async () => (await import('./pages/maintenance')).renderMaintenance,
 };
 
-function currentPath(): string {
+// 10 routes down to 5: backward-compatible redirects for stale PWA bookmarks / deep links
+const redirects: Record<string, string> = {
+  '/network': '/system?tab=network',
+  '/services': '/apps?tab=services',
+  '/containers': '/apps?tab=containers',
+  '/journal': '/ops?tab=journal',
+  '/maintenance': '/ops?tab=maintenance',
+  '/antigravity': '/ops?tab=quotas',
+};
+
+function currentRouteInfo(): { path: string; query: string } {
   const hash = window.location.hash || '#/';
-  const path = hash.replace(/^#/, '') || '/';
-  return path.split('?')[0];
+  const full = hash.replace(/^#/, '') || '/';
+  const [pathPart, queryPart = ''] = full.split('?');
+  const path = pathPart.startsWith('/') ? pathPart : `/${pathPart}`;
+  return { path, query: queryPart };
 }
 
 function setActive(path: string): void {
-  // Update desktop sidebar, mobile bottom tab bar and the More sheet.
-  document.querySelectorAll('#shellNav a, #mobileNav a, #gbMoreSheet a').forEach((a) => {
+  // Update desktop sidebar and mobile bottom tab bar
+  document.querySelectorAll('#shellNav a, #mobileNav a').forEach((a) => {
     const r = (a as HTMLElement).dataset.route;
     a.classList.toggle('active', r === path);
   });
-  // The More button lights up when the active route lives inside the sheet.
-  const moreRoutes = ['/services', '/containers', '/network', '/journal', '/maintenance', '/antigravity'];
-  document.getElementById('gbMoreBtn')?.classList.toggle('active', moreRoutes.includes(path));
 }
 
 export const router = {
   async render(): Promise<void> {
+    const { path, query } = currentRouteInfo();
+
+    // Handle old route redirects immediately
+    if (redirects[path]) {
+      const target = redirects[path];
+      window.location.replace(`#${target}`);
+      return;
+    }
+
     if (activeCleanup) {
       try {
         activeCleanup();
@@ -62,7 +75,6 @@ export const router = {
       activeCleanup = null;
     }
 
-    const path = currentPath();
     setActive(path);
     const page = document.getElementById('page')!;
     page.innerHTML = routeLoadingHtml();

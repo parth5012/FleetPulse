@@ -13,8 +13,20 @@ import type { MaintenanceDfResponse, DockerDfItem, ServicesResponse } from '../l
 import { esc, formatBytes } from '../lib/format';
 import { confirmDialog } from '../lib/ui';
 
-export async function renderMaintenance(container: HTMLElement): Promise<void> {
+export async function renderMaintenance(container: HTMLElement, isTab = false): Promise<void> {
   container.innerHTML = `
+    ${
+      isTab
+        ? `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div>
+          <h2 style="font-size:1.15rem; font-weight:600; margin:0;">Remote Maintenance & Cleanups</h2>
+          <p class="muted" style="font-size:0.82rem; margin:2px 0 0;">Safe, bounded one-tap operational controls: Docker GC, journal vacuuming, and core daemon restarts.</p>
+        </div>
+        <button id="refreshMaintBtn" class="btn btn-secondary btn-sm"><span id="refreshMaintIcon">🔄</span> Refresh Status</button>
+      </div>
+    `
+        : `
     <header class="page-header">
       <div>
         <div style="display:flex;align-items:center;gap:10px;">
@@ -29,6 +41,8 @@ export async function renderMaintenance(container: HTMLElement): Promise<void> {
         <button id="refreshMaintBtn" class="btn btn-primary"><span id="refreshMaintIcon">🔄</span> Refresh Status</button>
       </div>
     </header>
+    `
+    }
 
     <!-- Feedback Banner -->
     <div id="maintAlert" class="maint-alert" style="display:none;"></div>

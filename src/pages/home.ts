@@ -187,7 +187,7 @@ export async function renderHome(container: HTMLElement): Promise<void> {
     {
       label: 'Disk almost full',
       detail: `${disk.toFixed(0)}% used · ${formatBytes(sys.disk.free_bytes)} free`,
-      link: '/maintenance',
+      link: '/ops?tab=maintenance',
       ok: disk < 90,
       sev: disk >= 95 ? 'bad' : 'warn',
     },
@@ -196,7 +196,7 @@ export async function renderHome(container: HTMLElement): Promise<void> {
           {
             label: `${failedServices} service${failedServices === 1 ? '' : 's'} failed`,
             detail: 'systemd units in a failed state',
-            link: '/services',
+            link: '/apps?tab=services',
             ok: failedServices === 0,
             sev: 'bad' as const,
           },
@@ -207,7 +207,7 @@ export async function renderHome(container: HTMLElement): Promise<void> {
           {
             label: `Kernel OOM killer fired ${oomKills} time${oomKills === 1 ? '' : 's'}`,
             detail: 'Processes were killed by memory exhaustion',
-            link: '/journal',
+            link: '/ops?tab=journal',
             ok: oomKills === 0,
             sev: 'bad' as const,
           },
@@ -298,7 +298,7 @@ export async function renderHome(container: HTMLElement): Promise<void> {
       value: netKbps >= 1024 ? `${(netKbps / 1024).toFixed(1)} MB/s` : `${Math.round(netKbps)} KB/s`,
       sub: `↓ in · ↑ ${formatBytes(netTx)}/s out`,
       pct: null,
-      href: '/network',
+      href: '/system?tab=network',
       state: 'neutral',
     }),
   ].join('');
@@ -310,7 +310,7 @@ export async function renderHome(container: HTMLElement): Promise<void> {
   if (svcs) {
     quickItems.push(
       quickTile({
-        href: '/services',
+        href: '/apps?tab=services',
         label: 'Services',
         value: svcs ? `${svcs.overview.running_services} running${svcs.overview.failed_services ? ` · ${svcs.overview.failed_services} failed` : ''}` : '—',
         icon: QUICK_ICONS.services,
@@ -320,7 +320,7 @@ export async function renderHome(container: HTMLElement): Promise<void> {
   if (containers) {
     quickItems.push(
       quickTile({
-        href: '/containers',
+        href: '/apps?tab=containers',
         label: 'Containers',
         value: `${runningContainers}/${totalContainers} up`,
         icon: QUICK_ICONS.containers,
@@ -338,7 +338,7 @@ export async function renderHome(container: HTMLElement): Promise<void> {
   if (kernel) {
     quickItems.push(
       quickTile({
-        href: '/journal',
+        href: '/ops?tab=journal',
         label: 'Journal',
         value: oomKills === 0 ? 'No OOM events' : `${oomKills} OOM kills`,
         icon: QUICK_ICONS.journal,
@@ -347,7 +347,7 @@ export async function renderHome(container: HTMLElement): Promise<void> {
   }
   quickItems.push(
     quickTile({
-      href: '/maintenance',
+      href: '/ops?tab=maintenance',
       label: 'Maintenance',
       value: `${formatBytes(sys.disk.free_bytes)} free · prune tools`,
       icon: QUICK_ICONS.maintenance,

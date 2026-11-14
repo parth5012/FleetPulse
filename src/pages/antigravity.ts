@@ -400,9 +400,25 @@ function renderQoderAccount(acc: QoderAccountSnapshot): string {
   `;
 }
 
-export async function renderAntigravity(container: HTMLElement): Promise<void> {
+export async function renderAntigravity(container: HTMLElement, isTab = false): Promise<void> {
   container.innerHTML = `
     <div class="antigravity-page">
+      ${
+        isTab
+          ? `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+          <div>
+            <h2 style="font-size:1.15rem; font-weight:600; margin:0;">AI Quota Pools & Headroom</h2>
+            <p class="muted" style="font-size:0.82rem; margin:2px 0 0;">Real-time 5-hour and weekly LLM token pools with visual gauges and reset countdowns.</p>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span id="livePill" class="pill pill-live">Checking...</span>
+            <button id="refreshBtn" class="btn btn-secondary btn-sm"><span id="refreshIcon">🔄</span> Refresh</button>
+            <button id="syncBtn" class="btn btn-secondary btn-sm">⚡ Sync OmniRoute</button>
+          </div>
+        </div>
+      `
+          : `
       <!-- Page Header -->
       <header class="page-header">
         <div class="header-titles">
@@ -416,6 +432,8 @@ export async function renderAntigravity(container: HTMLElement): Promise<void> {
           <button id="syncBtn" class="btn btn-secondary">⚡ Sync OmniRoute</button>
         </div>
       </header>
+      `
+      }
 
       <!-- Visual Donut Gauges Ribbon (Mobile & Desktop Optimized) -->
       <div class="quota-visual-ribbon" id="quotaVisualRibbon">

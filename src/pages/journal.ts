@@ -8,8 +8,26 @@ import { esc } from '../lib/format';
 
 let refreshTimer: number | null = null;
 
-export async function renderJournal(container: HTMLElement): Promise<void> {
+export async function renderJournal(container: HTMLElement, isTab = false): Promise<void> {
   container.innerHTML = `
+    ${
+      isTab
+        ? `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <h2 style="font-size:1.15rem; font-weight:600; margin:0;">System Journal & Kernel PSI Watcher</h2>
+            <span class="pill pill-live" id="journalLivePill"><span class="pulse-dot"></span> STREAMING</span>
+          </div>
+          <p class="muted" style="font-size:0.82rem; margin:2px 0 0;">Live systemd journal log streaming, error level filtering, Linux PSI pressure stalls, and kernel OOM detection.</p>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button id="pauseJournalBtn" class="btn btn-secondary btn-sm"><span id="pauseJournalIcon">⏸️</span> Pause</button>
+          <button id="refreshJournalBtn" class="btn btn-secondary btn-sm"><span id="refreshJournalIcon">🔄</span> Refresh</button>
+        </div>
+      </div>
+    `
+        : `
     <header class="page-header">
       <div>
         <div style="display:flex;align-items:center;gap:10px;">
@@ -25,6 +43,8 @@ export async function renderJournal(container: HTMLElement): Promise<void> {
         <button id="refreshJournalBtn" class="btn btn-primary"><span id="refreshJournalIcon">🔄</span> Refresh</button>
       </div>
     </header>
+    `
+    }
 
     <!-- Kernel Watcher & PSI Memory Pressure Ribbon -->
     <div class="kernel-watcher-card" id="kernelWatcherCard">
