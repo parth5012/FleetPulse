@@ -1,3 +1,6 @@
+import { esc } from './lib/format';
+import { routeLoadingHtml } from './lib/ui';
+
 type RenderFn = (container: HTMLElement) => void | Promise<void>;
 
 let activeCleanup: (() => void) | null = null;
@@ -38,11 +41,14 @@ function currentPath(): string {
 }
 
 function setActive(path: string): void {
-  // Update both desktop header nav and mobile bottom tab bar
-  document.querySelectorAll('#shellNav a, #mobileNav a').forEach((a) => {
+  // Update desktop sidebar, mobile bottom tab bar and the More sheet.
+  document.querySelectorAll('#shellNav a, #mobileNav a, #gbMoreSheet a').forEach((a) => {
     const r = (a as HTMLElement).dataset.route;
     a.classList.toggle('active', r === path);
   });
+  // The More button lights up when the active route lives inside the sheet.
+  const moreRoutes = ['/services', '/containers', '/network', '/journal', '/maintenance', '/antigravity'];
+  document.getElementById('gbMoreBtn')?.classList.toggle('active', moreRoutes.includes(path));
 }
 
 export const router = {
@@ -59,17 +65,26 @@ export const router = {
     const path = currentPath();
     setActive(path);
     const page = document.getElementById('page')!;
-    page.innerHTML = '<div class="empty-state"><p class="spin">⚡</p><p>Loading...</p></div>';
+    page.innerHTML = routeLoadingHtml();
     const loader = routes[path] || routes['/'];
     try {
       const renderFn = await loader();
       await renderFn(page);
     } catch (err) {
-      page.innerHTML = `<div class="empty-state"><p>Error loading view: ${String(err)}</p></div>`;
+      page.innerHTML = `
+        <div class="gb-state gb-state-error">
+          <p class="gb-state-title">Couldn't load this page</p>
+          <p class="gb-state-sub">${esc(String(err))}</p>
+          <button class="gb-btn gb-btn-secondary" onclick="window.location.reload()">Try again</button>
+        </div>
+      `;
     }
+    document.dispatchEvent(new CustomEvent('gb:rendered'));
   },
   start(): void {
     window.addEventListener('hashchange', () => this.render());
+    // Freshness chip tap → re-render the current route.
+    window.addEventListener('gb:refresh', () => this.render());
     if (!window.location.hash) window.location.hash = '#/';
     this.render();
   },

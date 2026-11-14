@@ -11,6 +11,7 @@ import {
 } from '../lib/api';
 import type { MaintenanceDfResponse, DockerDfItem, ServicesResponse } from '../lib/api';
 import { esc, formatBytes } from '../lib/format';
+import { confirmDialog } from '../lib/ui';
 
 export async function renderMaintenance(container: HTMLElement): Promise<void> {
   container.innerHTML = `
@@ -214,7 +215,12 @@ export async function renderMaintenance(container: HTMLElement): Promise<void> {
       grid.querySelectorAll('.btn-restart-daemon').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const unit = (btn as HTMLElement).getAttribute('data-unit') || '';
-          if (!confirm(`Are you sure you want to restart ${unit}?`)) return;
+          const confirmed = await confirmDialog({
+            title: `Restart "${unit}"?`,
+            message: `Restarts the daemon "${unit}" via the maintenance shortcut.`,
+            confirmLabel: 'Restart',
+            danger: false,
+          });
 
           btn.innerHTML = `<span class="spin">🔄</span> Restarting...`;
           (btn as HTMLButtonElement).disabled = true;
@@ -239,7 +245,11 @@ export async function renderMaintenance(container: HTMLElement): Promise<void> {
   // Docker Prune action
   const pruneBtn = container.querySelector('#pruneDockerBtn') as HTMLButtonElement;
   pruneBtn.addEventListener('click', async () => {
-    if (!confirm('Run docker system prune -f to reclaim dangling images and stopped containers?')) return;
+    const confirmed = await confirmDialog({
+      title: 'Run docker prune?',
+      message: 'Runs "docker system prune -f" to reclaim dangling images and stopped containers.',
+      confirmLabel: 'Prune',
+    });
 
     pruneBtn.disabled = true;
     pruneBtn.innerHTML = `<span class="spin">⚡</span> Pruning Docker...`;

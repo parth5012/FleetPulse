@@ -1,5 +1,6 @@
 import { fetchApps, triggerAppAction } from '../lib/api';
 import { esc } from '../lib/format';
+import { confirmDialog } from '../lib/ui';
 import type { CuratedApp } from '../lib/api';
 
 export async function renderApps(container: HTMLElement): Promise<void> {
@@ -37,6 +38,15 @@ export async function renderApps(container: HTMLElement): Promise<void> {
           const name = (btn as HTMLElement).dataset.app!;
           const action = (btn as HTMLElement).dataset.appAction!;
           const statusEl = grid.querySelector(`#appStatus-${name}`) as HTMLElement;
+          if (action === 'stop' || action === 'restart') {
+            const confirmed = await confirmDialog({
+              title: `${action === 'stop' ? 'Stop' : 'Restart'} "${name}"?`,
+              message: `The app will ${action === 'stop' ? 'go offline' : 'restart; brief downtime while it comes back'}.`,
+              confirmLabel: action === 'stop' ? 'Stop' : 'Restart',
+              danger: action === 'stop',
+            });
+            if (!confirmed) return;
+          }
           if (statusEl) statusEl.textContent = `Executing ${action}...`;
           try {
             const res = await triggerAppAction(name, action as 'start' | 'stop' | 'restart');

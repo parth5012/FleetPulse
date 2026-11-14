@@ -7,6 +7,7 @@
 import { fetchContainers, fetchContainerLogs, triggerContainerAction } from '../lib/api';
 import { ansiToHtml, formatLogLevelBadge } from '../lib/ansi';
 import { esc } from '../lib/format';
+import { confirmDialog } from '../lib/ui';
 import type { ContainerSummary, LogLine } from '../lib/api';
 
 export async function renderContainers(container: HTMLElement): Promise<void> {
@@ -363,6 +364,15 @@ export async function renderContainers(container: HTMLElement): Promise<void> {
   // Container action buttons
   async function handleAction(action: string): Promise<void> {
     if (!selectedContainer) return;
+    if (action === 'restart' || action === 'stop') {
+      const confirmed = await confirmDialog({
+        title: `${action === 'stop' ? 'Stop' : 'Restart'} "${selectedContainer.name || selectedContainer.id}"?`,
+        message: `The container will ${action === 'stop' ? 'stop and its services go offline' : 'restart; brief downtime while it comes back'}.`,
+        confirmLabel: action === 'stop' ? 'Stop' : 'Restart',
+        danger: action === 'stop',
+      });
+      if (!confirmed) return;
+    }
     actionStatus.textContent = `Executing ${action}...`;
     try {
       const res = await triggerContainerAction(selectedContainer.name || selectedContainer.id, action);

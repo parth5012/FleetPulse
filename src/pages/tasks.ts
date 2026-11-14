@@ -5,6 +5,7 @@
  */
 
 import { fetchTasks, triggerTaskAction, TaskItem, TasksOverview } from '../lib/api';
+import { confirmDialog } from '../lib/ui';
 import { esc } from '../lib/format';
 import { renderDonutGauge, renderStackedBar, StackedSegment } from '../lib/charts';
 
@@ -492,7 +493,11 @@ function renderProcessList(view: Element): void {
       const pid = parseInt(el.dataset.pid || '0', 10);
       const name = el.dataset.name || `PID ${pid}`;
 
-      const confirmed = window.confirm(`Terminate process "${name}" (PID ${pid})?`);
+      const confirmed = await confirmDialog({
+        title: `Terminate "${name}"?`,
+        message: `Sends SIGTERM to process ${name} (PID ${pid}). The process will stop and may lose unsaved work.`,
+        confirmLabel: 'Terminate',
+      });
       if (!confirmed) return;
 
       el.setAttribute('disabled', 'true');

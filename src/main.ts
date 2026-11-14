@@ -1,4 +1,5 @@
 import './style.css';
+import './glanceboard.css';
 import { renderShell } from './shell';
 import { router } from './router';
 
