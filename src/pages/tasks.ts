@@ -234,7 +234,7 @@ function renderVitals(container: HTMLElement): void {
     cpuDonutEl.innerHTML = renderDonutGauge(ov.cpu_total_percent, {
       size: donutSize,
       strokeWidth: isMobile ? 4 : 5,
-      color: ov.cpu_total_percent > 75 ? '#ef4444' : ov.cpu_total_percent > 40 ? '#f59e0b' : '#10b981',
+      color: ov.cpu_total_percent > 75 ? '#dc2626' : ov.cpu_total_percent > 40 ? '#d97706' : '#059669',
     });
   }
 
@@ -244,7 +244,7 @@ function renderVitals(container: HTMLElement): void {
     ramDonutEl.innerHTML = renderDonutGauge(ov.memory_used_percent, {
       size: donutSize,
       strokeWidth: isMobile ? 4 : 5,
-      color: ov.memory_used_percent > 85 ? '#ef4444' : '#a855f7',
+      color: ov.memory_used_percent > 85 ? '#dc2626' : '#7c3aed',
     });
   }
 
@@ -260,7 +260,7 @@ function renderVitals(container: HTMLElement): void {
   if (distCard && state.tasks.length > 0) {
     distCard.style.display = 'block';
 
-    const colors = ['#10b981', '#a855f7', '#f59e0b', '#06b6d4', '#ec4899'];
+    const colors = ['#059669', '#7c3aed', '#d97706', '#0891b2', '#db2777'];
 
     // Top 5 by CPU
     const topCpuTasks = [...state.tasks]

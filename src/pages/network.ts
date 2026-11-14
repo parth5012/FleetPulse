@@ -194,7 +194,7 @@ export async function renderNetwork(container: HTMLElement): Promise<void> {
             <td><strong>:${r.port}</strong></td>
             <td><code>${esc(r.host)}</code></td>
             <td><code>${esc(r.path)}</code></td>
-            <td><span class="c-pill" style="color:#10b981;">${esc(r.proxy_target)}</span></td>
+            <td><span class="c-pill" style="color:#059669;">${esc(r.proxy_target)}</span></td>
             <td><span class="badge badge-info">TLS Terminated</span></td>
           </tr>
         `).join('');

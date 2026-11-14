@@ -1,9 +1,15 @@
+import { ROUTES } from './shell';
+
 type RenderFn = (container: HTMLElement) => void | Promise<void>;
 
 let activeCleanup: (() => void) | null = null;
 
 const routes: Record<string, () => Promise<RenderFn>> = {
-  '/': async () => (await import('./pages/home')).renderHome,
+  '/': async () => {
+    const mod = await import('./pages/home');
+    activeCleanup = mod.cleanupHome;
+    return mod.renderHome;
+  },
   '/tasks': async () => {
     const mod = await import('./pages/tasks');
     activeCleanup = mod.cleanupTasks;
@@ -58,14 +64,29 @@ export const router = {
 
     const path = currentPath();
     setActive(path);
+    const meta = ROUTES.find((r) => r.path === path);
+    document.title = meta && path !== '/' ? `${meta.name} — FleetPulse` : 'FleetPulse — Fleet Overview';
     const page = document.getElementById('page')!;
-    page.innerHTML = '<div class="empty-state"><p class="spin">⚡</p><p>Loading...</p></div>';
+    page.innerHTML = `
+      <div class="page-crumb"><span class="crumb-sep">FleetPulse</span> / ${meta ? meta.name : ''}</div>
+      <div class="page-title">${meta ? meta.name : 'Loading'}</div>
+      <div class="sk" style="width: 40%; height: 10px; margin-bottom: 24px;"></div>
+      <div class="sk" style="width: 100%; height: 120px; border-radius: 8px; margin-bottom: 12px;"></div>
+      <div class="sk" style="width: 100%; height: 220px; border-radius: 8px;"></div>
+    `;
     const loader = routes[path] || routes['/'];
     try {
       const renderFn = await loader();
       await renderFn(page);
     } catch (err) {
-      page.innerHTML = `<div class="empty-state"><p>Error loading view: ${String(err)}</p></div>`;
+      console.warn('Route render error', err);
+      page.innerHTML = `
+        <div class="empty-state">
+          <p style="font-weight:600; color: var(--text); margin-bottom: 4px;">Couldn't load this page</p>
+          <p class="text-muted" style="font-size:0.84rem;">${String(err)}</p>
+          <button class="ps-retry" onclick="location.reload()" style="margin-top:12px;">Retry</button>
+        </div>
+      `;
     }
   },
   start(): void {

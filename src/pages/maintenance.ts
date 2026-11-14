@@ -155,7 +155,7 @@ export async function renderMaintenance(container: HTMLElement): Promise<void> {
           <div class="df-tile">
             <div class="df-tile-title">${esc(d.type)} (${esc(d.active)}/${esc(d.total)})</div>
             <div class="df-tile-size">${esc(d.size)}</div>
-            <div class="df-tile-reclaim">Reclaimable: <strong style="color:#10b981;">${esc(d.reclaimable)}</strong></div>
+            <div class="df-tile-reclaim">Reclaimable: <strong style="color:#059669;">${esc(d.reclaimable)}</strong></div>
           </div>
         `).join('');
       }

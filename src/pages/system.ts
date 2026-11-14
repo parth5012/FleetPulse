@@ -59,7 +59,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
         <div class="chip-item"><span class="chip-icon">⏱️</span> <span id="bUptime">-</span></div>
         <div class="chip-item"><span class="chip-icon">🐧</span> <span id="bDistro">-</span></div>
         <div class="chip-item"><span class="chip-icon">⚙️</span> <span id="bCpuModel">-</span></div>
-        <div class="chip-item"><span class="chip-icon">💾</span> <strong id="bRamTotal" style="color:#10b981;">-</strong></div>
+        <div class="chip-item"><span class="chip-icon">💾</span> <strong id="bRamTotal" style="color:#059669;">-</strong></div>
       </div>
     </div>
 
@@ -101,7 +101,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
           <div class="sqlite-tile-val" id="statAvgRam">0.0%</div>
           <div class="sqlite-tile-sub" id="statRamRange">Min: 0% · Peak: 0%</div>
           <div class="bar-outer" style="height:4px;margin-top:6px;">
-            <div class="bar-inner" id="statRamBar" style="width:0%;background:#a855f7;"></div>
+            <div class="bar-inner" id="statRamBar" style="width:0%;background:#7c3aed;"></div>
           </div>
         </div>
 
@@ -114,7 +114,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
           <div class="sqlite-tile-val" id="statAvgLoad">0.00</div>
           <div class="sqlite-tile-sub" id="statLoadRange">5m: 0.00 · 15m: 0.00 · Peak 1m: 0.00</div>
           <div class="bar-outer" style="height:4px;margin-top:6px;">
-            <div class="bar-inner" id="statLoadBar" style="width:0%;background:#10b981;"></div>
+            <div class="bar-inner" id="statLoadBar" style="width:0%;background:#059669;"></div>
           </div>
         </div>
 
@@ -127,7 +127,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
           <div class="sqlite-tile-val" id="statAvgCpu">0.0%</div>
           <div class="sqlite-tile-sub" id="statCpuPeak">Peak: 0.0%</div>
           <div class="bar-outer" style="height:4px;margin-top:6px;">
-            <div class="bar-inner" id="statCpuBar" style="width:0%;background:#10b981;"></div>
+            <div class="bar-inner" id="statCpuBar" style="width:0%;background:#059669;"></div>
           </div>
         </div>
 
@@ -140,7 +140,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
           <div class="sqlite-tile-val" id="statSampleCount">0</div>
           <div class="sqlite-tile-sub" id="statDbSub">7-day automatic retention</div>
           <div class="bar-outer" style="height:4px;margin-top:6px;">
-            <div class="bar-inner" style="width:100%;background:#06b6d4;"></div>
+            <div class="bar-inner" style="width:100%;background:#0891b2;"></div>
           </div>
         </div>
       </div>
@@ -209,7 +209,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     const load15Values = hist.map((h) => h.load_15m || 0);
     const loadChartHtml = renderBeszelChart(
       [
-        { name: '1 min', color: '#a855f7', values: load1Values },
+        { name: '1 min', color: '#7c3aed', values: load1Values },
         { name: '5 min', color: '#3b82f6', values: load5Values },
         { name: '15 min', color: '#f97316', values: load15Values },
       ],
@@ -231,7 +231,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
       [
         {
           name: 'Used RAM',
-          color: '#10b981', // Beszel emerald
+          color: '#059669', // Beszel emerald
           values: memGbValues,
           gradient: true,
         },
@@ -256,7 +256,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
       [
         {
           name: 'Swap Used',
-          color: '#06b6d4', // Cyan
+          color: '#0891b2', // Cyan
           values: swapGbValues,
           gradient: true,
         },
@@ -352,7 +352,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
             <div class="service-meta-list" style="margin-top:8px;">
               <div><span>Packets In:</span> <strong>${Math.round(netSnap?.packets_recv_per_sec || 0)} pkt/s</strong></div>
               <div><span>Packets Out:</span> <strong>${Math.round(netSnap?.packets_sent_per_sec || 0)} pkt/s</strong></div>
-              <div><span>Mesh State:</span> <strong style="color:#10b981;">Tailscale Active</strong></div>
+              <div><span>Mesh State:</span> <strong style="color:#059669;">Tailscale Active</strong></div>
             </div>
           </div>
         </div>
@@ -370,7 +370,7 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
     const ioChartHtml = renderBeszelChart(
       [
         { name: 'Read', color: '#3b82f6', values: readValues },
-        { name: 'Write', color: '#10b981', values: writeValues },
+        { name: 'Write', color: '#059669', values: writeValues },
       ],
       {
         title: 'Disk Throughput (I/O)',
@@ -447,8 +447,8 @@ export async function renderSystem(container: HTMLElement): Promise<void> {
               </div>
               <div class="c-image" style="font-size:0.75rem; color:#71717a; margin:6px 0;"><code>${esc(c.image)}</code></div>
               <div class="c-stats-row" style="display:flex; justify-content:space-between; font-size:0.8rem; margin-top:8px;">
-                <div><span class="lbl">CPU</span> <strong style="color:#10b981;">${c.cpu_percent}%</strong></div>
-                <div><span class="lbl">MEM</span> <strong style="color:#a855f7;">${esc(c.mem_usage.split('/')[0] || c.mem_usage)}</strong></div>
+                <div><span class="lbl">CPU</span> <strong style="color:#059669;">${c.cpu_percent}%</strong></div>
+                <div><span class="lbl">MEM</span> <strong style="color:#7c3aed;">${esc(c.mem_usage.split('/')[0] || c.mem_usage)}</strong></div>
                 <div><span class="lbl">PIDs</span> <strong>${c.pids}</strong></div>
               </div>
             </div>

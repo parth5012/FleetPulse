@@ -87,3 +87,36 @@
 - **What went well:** Zero-dependency SVG approach yielded high-fps, crisp graphs without extra bundle overhead; real Docker CLI integration combined with automatic fallback ensures both local hardware stats and CI/sandboxed tests pass 100% reliably.
 - **What broke:** In early test runs, `test_containers.py` invoked real docker restart against local containers; quickly mitigated by mocking action tests so user container fleet remains completely uninterrupted.
 - **What to improve next time:** Add WebSocket support alongside SSE for bi-directional terminal input in future iterations.
+
+---
+
+## Iteration: "Daylight Console" light-theme UI/UX redesign (2026-11-14)
+
+**Status: Done** — branch `ch/daylight-console-light-theme-redesign`
+
+### What changed
+- Light-first token system in `src/style.css`: gray-50 canvas, white cards, 1px hairline borders,
+  soft elevation tokens, AA status colors; all hardcoded dark surfaces migrated to tokens
+  (log consoles intentionally stay dark for ANSI readability).
+- New shell (`src/shell.ts`): SVG icon set + route registry, grouped desktop nav with "More"
+  dropdown, command/quick-jump search (`/` shortcut, arrow keys, Enter) on desktop and mobile,
+  mobile bottom nav (4 pinned slots ≥48px + "More" bottom sheet).
+- Home page (`src/pages/home.ts`) rebuilt: breadcrumb page header, host strip, vitals strip
+  (CPU/RAM/Disk/Network, live-polled every 5s with cleanup), status tiles for services/
+  containers/journal/quotas/disk/mesh, live panels (top processes, heaviest services), quick
+  links to every route. Skeleton shimmer, inline error + Retry, and empty states for all
+  async sections.
+- Router (`src/router.ts`): skeleton loading state, per-page document titles, designed error state.
+- `src/lib/charts.ts`: light-theme defaults (AA gridlines/axis text via tokens, emerald default).
+- Page hex palettes migrated to AA-tuned series colors; `index.html` theme-color/title updated.
+
+### Verification
+- `npx tsc --noEmit`: clean. `pnpm build`: clean. `npx vitest run`: 16/16 passed.
+- Playwright screenshots (device emulation): desktop 1440x900 Home + System, mobile 390x844 Home
+  + More sheet — all >100KB, verified visually; mobile horizontal overflow eliminated
+  (documentElement.scrollWidth == 390).
+- Python/pytest backend suite untouched (no backend files modified).
+
+### Notes
+- Files produced: `.tmp/screenshots/{home-desktop-1440x900,system-desktop-1440x900,home-mobile-390x844,home-mobile-more-sheet}.png`
+- `ocr-review` visual pass done manually via captured PNGs (headless env, no OCR session needed).
