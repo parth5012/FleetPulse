@@ -5,6 +5,8 @@
  * All touch targets >= 44px. Safe-area insets handled.
  */
 
+import { THEMES, getStoredTheme, setTheme, ThemeId } from './lib/theme';
+
 export interface NavItem {
   route: string;
   label: string;
@@ -73,13 +75,18 @@ export function renderShell(root: HTMLElement): void {
       </aside>
 
       <div class="gb-main">
-        <!-- Top bar (freshness lives here on both layouts) -->
+        <!-- Top bar (theme picker & freshness live here) -->
         <header class="gb-topbar">
           <a href="#/" class="gb-brand gb-brand-mobile" aria-label="FleetPulse home">
             <span class="gb-brand-mark">${svg('<path d="M12 2.5 21 7.4v9.2l-9 4.9-9-4.9V7.4z"/><path d="M12 22V12.3"/>')}</span>
             <span class="gb-brand-name">FleetPulse</span>
           </a>
           <div class="gb-topbar-right">
+            <div class="gb-theme-picker-wrap">
+              <select id="gbThemeSelect" class="gb-theme-select" aria-label="T3 Code Themes" title="Theme (T3 Code & Glanceboard)">
+                ${THEMES.map((t) => `<option value="${t.id}">${t.name}</option>`).join('')}
+              </select>
+            </div>
             <button id="pwaInstallBtn" class="gb-btn gb-btn-secondary gb-install-btn" style="display: none;">Install</button>
             <button id="gbFreshness" class="gb-freshness" title="Reload current view">
               <span class="gb-fresh-dot"></span>
@@ -98,7 +105,17 @@ export function renderShell(root: HTMLElement): void {
     </div>
   `;
 
+  wireThemePicker();
   wireFreshness();
+}
+
+function wireThemePicker(): void {
+  const select = document.getElementById('gbThemeSelect') as HTMLSelectElement | null;
+  if (!select) return;
+  select.value = getStoredTheme();
+  select.addEventListener('change', () => {
+    setTheme(select.value as ThemeId);
+  });
 }
 
 let lastRender = Date.now();

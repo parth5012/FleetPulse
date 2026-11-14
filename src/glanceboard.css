@@ -60,6 +60,159 @@
 }
 
 /* ---------------------------------------------------------------------------
+   T3 Code Theme Palettes
+--------------------------------------------------------------------------- */
+
+/* T3 Code: Poimandres (Midnight Slate & Mint) */
+[data-theme="poimandres"] {
+  --gb-bg: #1b1e28;
+  --gb-surface: #21242f;
+  --gb-surface-2: #262934;
+  --gb-border: rgba(166, 172, 205, 0.14);
+  --gb-border-strong: rgba(166, 172, 205, 0.28);
+  --gb-text: #e4f0fb;
+  --gb-muted: #a6accd;
+  --gb-faint: #767c9d;
+  --gb-ok: #5de4c7;
+  --gb-ok-subtle: rgba(93, 228, 199, 0.14);
+  --gb-warn: #fffac2;
+  --gb-warn-subtle: rgba(255, 250, 194, 0.14);
+  --gb-bad: #d0679d;
+  --gb-bad-subtle: rgba(208, 103, 157, 0.14);
+  --gb-neutral-dot: #767c9d;
+
+  --bg-primary: #1b1e28;
+  --card-bg: #21242f;
+  --card-border: rgba(166, 172, 205, 0.14);
+  --text-primary: #e4f0fb;
+  --text-muted: #a6accd;
+  --accent: #5de4c7;
+}
+
+/* T3 Code: Catppuccin (Macchiato Dark / Latte Light) */
+[data-theme="catppuccin"] {
+  --gb-bg: #24273a;
+  --gb-surface: #1e2030;
+  --gb-surface-2: #363a4f;
+  --gb-border: rgba(202, 211, 245, 0.14);
+  --gb-border-strong: rgba(202, 211, 245, 0.28);
+  --gb-text: #cad3f5;
+  --gb-muted: #b8c0e0;
+  --gb-faint: #8087a2;
+  --gb-ok: #8bd5ca;
+  --gb-ok-subtle: rgba(139, 213, 202, 0.14);
+  --gb-warn: #eed49f;
+  --gb-warn-subtle: rgba(238, 212, 159, 0.14);
+  --gb-bad: #ed8796;
+  --gb-bad-subtle: rgba(237, 135, 150, 0.14);
+  --gb-neutral-dot: #8087a2;
+
+  --bg-primary: #24273a;
+  --card-bg: #1e2030;
+  --card-border: rgba(202, 211, 245, 0.14);
+  --text-primary: #cad3f5;
+  --text-muted: #b8c0e0;
+  --accent: #c6a0f6;
+}
+@media (prefers-color-scheme: light) {
+  [data-theme="catppuccin"] {
+    --gb-bg: #eff1f5;
+    --gb-surface: #ffffff;
+    --gb-surface-2: #e8e9ee;
+    --gb-border: #d1cadf;
+    --gb-border-strong: #b8afcd;
+    --gb-text: #241523;
+    --gb-muted: #716873;
+    --gb-faint: #988ba2;
+    --gb-ok: #059669;
+    --gb-ok-subtle: rgba(5, 150, 105, 0.12);
+    --gb-warn: #fe9a00;
+    --gb-warn-subtle: rgba(254, 154, 0, 0.12);
+    --gb-bad: #fb2c36;
+    --gb-bad-subtle: rgba(251, 44, 54, 0.12);
+    --accent: #8839ef;
+  }
+}
+
+/* T3 Code: Dracula (Gothic Slate & Lavender Purple) */
+[data-theme="dracula"] {
+  --gb-bg: #282a36;
+  --gb-surface: #21222c;
+  --gb-surface-2: #343746;
+  --gb-border: #44475a;
+  --gb-border-strong: rgba(189, 147, 249, 0.35);
+  --gb-text: #f8f8f2;
+  --gb-muted: #c8d0e8;
+  --gb-faint: #6272a4;
+  --gb-ok: #50fa7b;
+  --gb-ok-subtle: rgba(80, 250, 123, 0.14);
+  --gb-warn: #ffb86c;
+  --gb-warn-subtle: rgba(255, 184, 108, 0.14);
+  --gb-bad: #ff5555;
+  --gb-bad-subtle: rgba(255, 85, 85, 0.14);
+  --gb-neutral-dot: #6272a4;
+
+  --bg-primary: #282a36;
+  --card-bg: #21222c;
+  --card-border: #44475a;
+  --text-primary: #f8f8f2;
+  --text-muted: #c8d0e8;
+  --accent: #bd93f9;
+}
+
+/* T3 Code: Glacier Slate Coral (Frosty Cyan & Deep Abyss) */
+[data-theme="glacier-slate"] {
+  --gb-bg: #152123;
+  --gb-surface: #1a2729;
+  --gb-surface-2: #1f2e31;
+  --gb-border: #243437;
+  --gb-border-strong: rgba(152, 188, 189, 0.3);
+  --gb-text: #e4eceb;
+  --gb-muted: #93a9a8;
+  --gb-faint: #6f8786;
+  --gb-ok: #98bcbd;
+  --gb-ok-subtle: rgba(152, 188, 189, 0.14);
+  --gb-warn: #ddbb80;
+  --gb-warn-subtle: rgba(221, 187, 128, 0.14);
+  --gb-bad: #e08a80;
+  --gb-bad-subtle: rgba(224, 138, 128, 0.14);
+  --gb-neutral-dot: #6f8786;
+
+  --bg-primary: #152123;
+  --card-bg: #1a2729;
+  --card-border: #243437;
+  --text-primary: #e4eceb;
+  --text-muted: #93a9a8;
+  --accent: #98bcbd;
+}
+
+/* T3 Code: Dark Modern (Carbon Charcoal & Indigo) */
+[data-theme="darkmodern"] {
+  --gb-bg: #1F1F1F;
+  --gb-surface: #222222;
+  --gb-surface-2: #2B2B2B;
+  --gb-border: #2B2B2B;
+  --gb-border-strong: rgba(99, 102, 241, 0.35);
+  --gb-text: #CCCCCC;
+  --gb-muted: #9D9D9D;
+  --gb-faint: #868686;
+  --gb-ok: #34d399;
+  --gb-ok-subtle: rgba(52, 211, 153, 0.14);
+  --gb-warn: #D29922;
+  --gb-warn-subtle: rgba(210, 153, 34, 0.14);
+  --gb-bad: #F85149;
+  --gb-bad-subtle: rgba(248, 81, 73, 0.14);
+  --gb-neutral-dot: #868686;
+
+  --bg-primary: #1F1F1F;
+  --card-bg: #222222;
+  --card-border: #2B2B2B;
+  --text-primary: #CCCCCC;
+  --text-muted: #9D9D9D;
+  --accent: #6366F1;
+}
+
+/* ---------------------------------------------------------------------------
    Base
 --------------------------------------------------------------------------- */
 body {
@@ -255,6 +408,34 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Theme selector in top bar */
+.gb-theme-picker-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.gb-theme-select {
+  height: 34px;
+  background: var(--gb-surface);
+  border: 1px solid var(--gb-border);
+  border-radius: 999px;
+  color: var(--gb-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 10px;
+  cursor: pointer;
+  outline: none;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.gb-theme-select:hover {
+  border-color: var(--gb-border-strong);
+}
+.gb-theme-select:focus-visible {
+  border-color: var(--gb-ok);
+  box-shadow: 0 0 0 2px var(--gb-ok-subtle);
 }
 
 /* Freshness chip — doubles as a reload button. */

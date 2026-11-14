@@ -43,9 +43,11 @@ Multi-aspect pages (`System`, `Apps`, `Ops`) feature horizontal-scrolling segmen
 - **No sense of freshness** → "Updated 12s ago" chip in the top bar; tap it to reload the view. Pulses green while data is fresh.
 - **PWA-hostile chrome** → Safe-area insets (`env(safe-area-inset-bottom/-top)`) on nav, top bar, page and dialog; pinch-to-zoom enabled for accessibility; visible `:focus-visible` rings; `prefers-reduced-motion` respected.
 
-## Tokens
+## Tokens & Themes
 
-| Token | Dark | Light |
+### Core Glanceboard Tokens
+
+| Token | Dark (Obsidian) | Light |
 |---|---|---|
 | `--gb-bg` / surface / surface-2 | `#0b0d10` / `#14161b` / `#191c22` | `#f5f6f8` / `#fff` / `#f0f1f4` |
 | `--gb-border` | `rgba(255,255,255,.07)` | `rgba(0,0,0,.08)` |
@@ -56,6 +58,15 @@ Multi-aspect pages (`System`, `Apps`, `Ops`) feature horizontal-scrolling segmen
 
 - Spacing: 4/8/12/16/20/24; radii 8/12px; type weights 400/550/650 only.
 - Implementation note: the design lives in `src/glanceboard.css` (loaded after `style.css`), which re-themes the token layer and quiets legacy components, so unrebuilt pages inherit the calmer look without breaking.
+
+### Authentic T3 Code Theme Presets
+Glanceboard incorporates authentic color palettes pulled directly from the T3 Code theme registry (`mcp_t3-code_t3_theme_read`), selectable directly from the top bar theme picker and persisted across PWA reloads:
+- **Obsidian (Glanceboard Default)**: Ultra-clean Geist dark slate / light neutral.
+- **Poimandres**: Midnight slate `#1b1e28`, surface `#21242f`, mint accent `#5de4c7`, soft ice text `#e4f0fb`.
+- **Catppuccin**: Warm Macchiato dark (`#24273a`, surface `#1e2030`, mauve `#c6a0f6`) & Latte light (`#eff1f5`, lavender `#8839ef`).
+- **Dracula**: Classic gothic dark slate `#282a36`, `#21222c`, purple accent `#bd93f9`, vibrant green ok `#50fa7b`.
+- **Glacier Slate**: Deep icy cyan `#152123`, surface `#1a2729`, glacier cyan accent `#98bcbd`, coral warnings `#e08a80`.
+- **Dark Modern**: Crisp VS Code-style charcoal `#1F1F1F`, surface `#222222`, indigo accent `#6366F1`.
 
 ## Patterns borrowed
 
