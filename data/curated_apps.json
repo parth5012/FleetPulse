@@ -201,7 +201,7 @@
     "kind": "docker",
     "compose_dir": "/home/parth/projects/fleet/services/docmost",
     "container": "docmost",
-    "url": "https://sullivan-offline-enhanced-sequence.trycloudflare.com",
+    "url": "https://classical-hiking-commentary-grill.trycloudflare.com",
     "icon": "\ud83d\udcda",
     "public": true,
     "tunnel_port": 3010
@@ -213,7 +213,7 @@
     "kind": "docker",
     "compose_dir": "/home/parth/projects/fleet/services/picoshare",
     "container": "picoshare",
-    "url": "https://pleasant-pump-thinks-harry.trycloudflare.com",
+    "url": "https://infrastructure-spy-provide-renewable.trycloudflare.com",
     "icon": "\ud83d\udcce",
     "public": true,
     "tunnel_port": 8088
@@ -225,7 +225,7 @@
     "kind": "docker",
     "compose_dir": "/home/parth/projects/fleet/services/enclosed",
     "container": "enclosed",
-    "url": "https://updates-totals-endorsed-hampton.trycloudflare.com",
+    "url": "https://william-baseline-dependence-flooring.trycloudflare.com",
     "icon": "\ud83d\udd12",
     "public": true,
     "tunnel_port": 8787
